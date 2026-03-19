@@ -1,0 +1,49 @@
+services:
+  # -------------------------
+  # PostgreSQL Database
+  # -------------------------
+  db:
+    image: postgres:latest
+    container_name: PostgreSQL_DB
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER_SECRET}
+      POSTGRES_PASSWORD: ${DB_PASSWORD_SECRET}
+      POSTGRES_DB: ${DB_NAME_SECRET}
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./init-db:/docker-entrypoint-initdb.d
+      - postgres_data:/var/lib/postgresql
+    networks:
+      - rideflow_network
+
+  # -------------------------
+  # pgAdmin
+  # -------------------------
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadminApp
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+    ports:
+      - "8080:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - db
+    networks:
+      - rideflow_network
+
+# -------------------------
+# Volumes
+# -------------------------
+volumes:
+  postgres_data:
+  pgadmin_data:
+
+
+networks:
+  rideflow_network:
