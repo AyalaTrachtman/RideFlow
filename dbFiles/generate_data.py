@@ -1,715 +1,360 @@
-"""
-generate_data.py  –  RideFlow PostgreSQL Idempotent Seeder
-──────────────────────────────────────────────────────────────────────────────
-Generates realistic synthetic data and inserts it directly into the RideFlow
-PostgreSQL database.  Safe to run multiple times on a non-empty database:
-
-  • Fetches MAX(pk) from the DB before assigning new IDs   → no PK collision
-  • Pre-loads existing unique values (emails, phones, plates) from the DB
-  • Checks natural-key existence before every INSERT       → no duplicate data
-  • Wraps everything in one transaction (commit / rollback)
-
-Insertion order (FK-safe):
-    STOP → ROUTE → DRIVER → VEHICLE → INCLUDES → TRIP → PASSENGER → REGISTRATION
-
-Usage:
-    python generate_data.py                        # incremental seed
-    python generate_data.py --reset                # wipe + full re-seed
-    python generate_data.py --counts stop=30 trip=60 passenger=100
-    python generate_data.py --tables trip passenger
-    python generate_data.py --seed 42              # reproducible
-
-Requirements:
-    pip install psycopg2-binary python-dotenv faker
-"""
-
-from __future__ import annotations
-
-import argparse
-import datetime
-import logging
 import os
-import random
 import sys
+import random
+import re
 from pathlib import Path
-from typing import Any
-
-import psycopg2
-import psycopg2.extras
 from dotenv import load_dotenv
+from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
-# ── Optional Faker ────────────────────────────────────────────────────────────
+# Faker import and initialization
 try:
     from faker import Faker
-    _FAKER_AVAILABLE = True
+    fake = Faker("he_IL")
 except ImportError:
-    _FAKER_AVAILABLE = False
+    print("Faker not installed. Please install with: pip install faker")
+    sys.exit(1)
 
-# ── Logging ───────────────────────────────────────────────────────────────────
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
-logger = logging.getLogger(__name__)
-
-# ── .env  (two levels up: dbFiles → RideFlow root) ───────────────────────────
 ENV_PATH = Path(__file__).resolve().parent.parent / ".env"
 load_dotenv(dotenv_path=ENV_PATH)
 
-# ── Insertion order ───────────────────────────────────────────────────────────
-TABLE_ORDER = [
-    "stop", "route", "driver", "vehicle",
-    "includes", "trip", "passenger", "registration",
-]
+db_user     = os.getenv("DB_USER_SECRET")
+db_password = os.getenv("DB_PASSWORD_SECRET")
+db_name     = os.getenv("DB_NAME_SECRET")
 
-# Delete order for --reset (reverse FK dependency)
-RESET_ORDER = list(reversed(TABLE_ORDER))
+# Maintaining existing connection logic
+DATABASE_URL = f"postgresql://{db_user}:{db_password}@localhost:5432/{db_name}"
+engine = create_engine(DATABASE_URL)
 
-# Default *additional* row counts to insert per run
-DEFAULT_COUNTS: dict[str, int] = {
-    "stop":         20,
-    "route":         8,
-    "driver":       10,
-    "vehicle":      10,
-    "includes":      0,   # derived: 3-6 stops per new route
-    "trip":         30,
-    "passenger":    50,
-    "registration":  0,   # derived: 0-8 per new trip
-}
+def get_random_fk_value(connection, referred_table, referred_column):
+    """Query the parent table to get existing IDs and return a random one."""
+    query = text(f'SELECT "{referred_column}" FROM "{referred_table}"')
+    result = connection.execute(query).fetchall()
+    if not result:
+        return None
+    return random.choice(result)[0]
 
-# ── Domain data ───────────────────────────────────────────────────────────────
-ISRAELI_CITIES = [
-    "Tel Aviv", "Jerusalem", "Haifa", "Rishon LeZion", "Petah Tikva",
-    "Ashdod", "Netanya", "Beer Sheva", "Bnei Brak", "Holon",
-    "Ramat Gan", "Ashkelon", "Rehovot", "Bat Yam", "Herzliya",
-    "Kfar Saba", "Modi'in", "Ra'anana", "Lod", "Eilat",
-    "Nahariya", "Hadera", "Nazareth", "Acre", "Afula",
-    "Tiberias", "Nof HaGalil", "Kiryat Gat", "Dimona", "Arad",
-]
-SECTORS        = ["North", "South", "Center", "Jerusalem", "Haifa District", "Sharon", "Negev"]
-VEHICLE_TYPES  = ["Bus", "Minibus", "Van", "Shuttle", "Electric Bus"]
-CAPACITIES     = {"Bus": 80, "Minibus": 25, "Van": 15, "Shuttle": 20, "Electric Bus": 75}
-LICENSE_TYPES  = ["B", "C", "D", "D1", "D+E"]
-REG_STATUSES   = ["confirmed", "waitlisted", "cancelled"]
-DEPARTURE_TIMES = [
-    "06:00", "06:30", "07:00", "07:15", "07:30", "07:45",
-    "08:00", "08:30", "09:00", "10:00", "12:00", "13:00",
-    "14:00", "15:00", "16:00", "17:00", "18:00", "19:00",
-]
-ROUTE_PREFIXES = [
-    "Northern Express", "Southern Line", "Central Loop", "Express", "Coastal",
-    "Mountain Route", "Valley Line", "Metro Connect", "Ring Road", "Direct",
-]
-STOP_SUFFIXES = [
-    "Central Station", "North", "South", "Mall", "University",
-    "Bus Terminal", "Market", "Park", "Hospital", "Junction",
-]
-
-
-# ── Shared state (FK registry + uniqueness guards) ────────────────────────────
-class _State:
-    # IDs known to exist in the DB (pre-loaded + newly inserted)
-    stop_ids:      list[int] = []
-    route_ids:     list[int] = []
-    driver_ids:    list[int] = []
-    plate_numbers: list[str] = []
-    trip_ids:      list[int] = []
-    passenger_ids: list[int] = []
-
-    # Route → stops mapping (built from INCLUDES rows)
-    route_stops:  dict[int, list[int]] = {}
-    # Trip → route mapping
-    trip_route:   dict[int, int]       = {}
-
-    # Uniqueness sets (pre-loaded from DB + newly inserted values)
-    existing_stop_names:   set[str]         = set()
-    existing_route_names:  set[str]         = set()
-    existing_driver_keys:  set[tuple]       = set()  # (fullname, licenseType)
-    existing_plates:       set[str]         = set()
-    existing_emails:       set[str]         = set()
-    existing_phones:       set[str]         = set()
-    existing_trip_keys:    set[tuple]       = set()  # (trip_date, route_id, driver_id)
-    existing_includes:     set[tuple]       = set()  # (route_id, stop_id)
-    existing_reg_pairs:    set[tuple[int,int]] = set()  # (pass_id, trip_id)
-
-_S = _State()
-
-# ── Faker / fallback ──────────────────────────────────────────────────────────
-_fake: "Faker | None" = None
-
-def _init_faker(seed: int | None) -> None:
-    global _fake
-    if _FAKER_AVAILABLE:
-        _fake = Faker("he_IL")
-        if seed is not None:
-            Faker.seed(seed)
-    if seed is not None:
-        random.seed(seed)
-
-
-def _full_name() -> str:
-    if _fake:
-        return _fake.name()
-    first = random.choice(["Avi","Maya","Yosef","Sara","David","Tamar",
-                            "Moshe","Noa","Eitan","Shira","Ron","Lior"])
-    last  = random.choice(["Cohen","Levi","Mizrahi","Peretz","Biton",
-                            "Azulay","Friedman","Katz","Shapiro","Ben-David"])
-    return f"{first} {last}"
-
-
-def _unique_email(name: str, uid: int) -> str:
-    parts = name.lower().split()
-    local = "".join(c for c in "_".join(parts) if c.isalnum() or c == "_")
-    domains = ["gmail.com","yahoo.com","walla.co.il","hotmail.com","outlook.com"]
-    base  = f"{local}{uid}"
-    email = f"{base}@{random.choice(domains)}"
-    counter = 0
-    while email in _S.existing_emails:
-        counter += 1
-        email = f"{base}_{counter}@{random.choice(domains)}"
-    _S.existing_emails.add(email)
-    return email
-
-
-def _unique_phone(uid: int) -> str:
-    prefixes = ["050","052","053","054","055","058"]
-    phone = f"{random.choice(prefixes)}{str(uid % 10_000_000).zfill(7)}"
-    counter = 0
-    while phone in _S.existing_phones:
-        counter += 1
-        phone = f"{random.choice(prefixes)}{str((uid + counter * 97) % 10_000_000).zfill(7)}"
-    _S.existing_phones.add(phone)
-    return phone
-
-
-def _unique_plate() -> str:
-    letters = "ABCDEFGHIJKLMNPQRSTUVWXYZ"
-    for _ in range(5000):
-        plate = "".join(random.choices(letters, k=3)) + "-" + str(random.randint(100, 999))
-        if plate not in _S.existing_plates:
-            _S.existing_plates.add(plate)
-            return plate
-    raise RuntimeError("Could not generate a unique plate number after 5000 attempts.")
-
-
-# ── Database connection ───────────────────────────────────────────────────────
-
-def get_connection() -> psycopg2.extensions.connection:
-    """Return a psycopg2 connection from .env credentials."""
-  
-    host     = os.getenv("DB_HOST", "localhost")
-    port     = int(os.getenv("DB_PORT", 5432))
-    dbname   = os.getenv("DB_NAME_SECRET", "").strip()
-    user     = os.getenv("DB_USER_SECRET", "").strip()
-    password = os.getenv("DB_PASSWORD_SECRET", "").strip()
-
-    print("USER:", user)
-    print("DB:", dbname)
-    print("PASSWORD:", repr(password))
-
-
-    if not all([dbname, user, password]):
-        logger.error("Missing DB credentials in .env (%s).", ENV_PATH)
-        sys.exit(1)
-
-    logger.info("Connecting to '%s' at %s:%s as '%s'…", dbname, host, port, user)
+def analyze_check_constraints(inspector, table_name):
+    """Attempt to parse CHECK constraints for IN (...) logic."""
+    constraints_map = {}
     try:
-        conn = psycopg2.connect(
-            host=host, port=port,
-            dbname=dbname, user=user, password=password,
-        )
-        conn.autocommit = False
-        logger.info("Connection established.")
-        return conn
-    except psycopg2.OperationalError as exc:
-        logger.error("Cannot connect: %s", exc)
-        sys.exit(1)
+        checks = inspector.get_check_constraints(table_name)
+        for ch in checks:
+            sqltext = ch.get('sqltext', '')
+            tokens = list(set(re.findall(r"'([^']+)'", sqltext)))
+            for col in inspector.get_columns(table_name):
+                if col['name'] in sqltext and tokens:
+                    if col['name'] not in constraints_map:
+                        constraints_map[col['name']] = []
+                    for t in tokens:
+                        if t not in constraints_map[col['name']]:
+                            constraints_map[col['name']].append(t)
+    except Exception:
+        pass
+    return constraints_map
 
-
-# ── Pre-load existing DB state ────────────────────────────────────────────────
-
-def _scalar(cursor, sql: str, params=()) -> Any:
-    cursor.execute(sql, params)
-    row = cursor.fetchone()
-    return row[0] if row else None
-
-
-def preload_existing_state(cursor) -> None:
+def sample_existing_data(connection, table_name, columns):
     """
-    Read the current DB contents into _S so that:
-      - New IDs start above existing max PKs.
-      - Uniqueness sets include already-present natural keys.
-      - FK registries include all existing IDs.
+    Sample existing rows to find categorical columns or typical formats.
     """
-    logger.info("Pre-loading existing database state…")
-
-    # ── STOP ──────────────────────────────────────────────────────────────────
-    cursor.execute('SELECT stop_id, stop_name FROM "STOP"')
-    for sid, sname in cursor.fetchall():
-        _S.stop_ids.append(sid)
-        _S.existing_stop_names.add(sname)
-
-    # ── ROUTE ─────────────────────────────────────────────────────────────────
-    cursor.execute('SELECT route_id, route_name FROM "ROUTE"')
-    for rid, rname in cursor.fetchall():
-        _S.route_ids.append(rid)
-        _S.existing_route_names.add(rname)
-
-    # ── DRIVER ────────────────────────────────────────────────────────────────
-    cursor.execute('SELECT driver_id, driver_fullname, "licenseType" FROM "DRIVER"')
-    for did, fname, ltype in cursor.fetchall():
-        _S.driver_ids.append(did)
-        _S.existing_driver_keys.add((fname, ltype))
-
-    # ── VEHICLE ───────────────────────────────────────────────────────────────
-    cursor.execute('SELECT plate_number FROM "VEHICLE"')
-    for (plate,) in cursor.fetchall():
-        _S.plate_numbers.append(plate)
-        _S.existing_plates.add(plate)
-
-    # ── INCLUDES ──────────────────────────────────────────────────────────────
-    cursor.execute('SELECT route_id, stop_id FROM "INCLUDES"')
-    for rid, sid in cursor.fetchall():
-        _S.existing_includes.add((rid, sid))
-        _S.route_stops.setdefault(rid, []).append(sid)
-
-    # ── TRIP ──────────────────────────────────────────────────────────────────
-    cursor.execute('SELECT trip_id, trip_date, route_id, driver_id FROM "TRIP"')
-    for tid, tdate, rid, did in cursor.fetchall():
-        _S.trip_ids.append(tid)
-        _S.trip_route[tid] = rid
-        _S.existing_trip_keys.add((tdate, rid, did))
-
-    # ── PASSENGER ─────────────────────────────────────────────────────────────
-    cursor.execute('SELECT pass_id, email, phone FROM "PASSENGER"')
-    for pid, email, phone in cursor.fetchall():
-        _S.passenger_ids.append(pid)
-        if email:
-            _S.existing_emails.add(email)
-        if phone:
-            _S.existing_phones.add(phone)
-
-    # ── REGISTRATION ──────────────────────────────────────────────────────────
-    cursor.execute('SELECT pass_id, trip_id FROM "REGISTRATION"')
-    for pid, tid in cursor.fetchall():
-        _S.existing_reg_pairs.add((pid, tid))
-
-    logger.info(
-        "Pre-load complete — stops:%d routes:%d drivers:%d vehicles:%d "
-        "trips:%d passengers:%d registrations:%d",
-        len(_S.stop_ids), len(_S.route_ids), len(_S.driver_ids),
-        len(_S.plate_numbers), len(_S.trip_ids),
-        len(_S.passenger_ids), len(_S.existing_reg_pairs),
-    )
-
-
-def _next_id(cursor, table: str, pk_col: str) -> int:
-    """Return MAX(pk_col)+1 for *table*, or 1 if the table is empty."""
-    val = _scalar(cursor, f'SELECT COALESCE(MAX("{pk_col}"), 0) FROM "{table}"')
-    return int(val) + 1
-
-
-# ── INSERT helper ─────────────────────────────────────────────────────────────
-
-def _insert_row(cursor, table: str, row: dict[str, Any]) -> None:
-    cols  = list(row.keys())
-    query = (
-        f'INSERT INTO "{table.upper()}" '
-        f'({", ".join(f"{chr(34)}{c}{chr(34)}" for c in cols)}) '
-        f'VALUES ({", ".join(["%s"] * len(cols))})'
-    )
-    cursor.execute(query, tuple(row.values()))
-
-
-# ── Row generators ────────────────────────────────────────────────────────────
-
-def _gen_stop_name() -> str:
-    """Generate a stop name not already in the DB."""
-    for _ in range(2000):
-        city = random.choice(ISRAELI_CITIES)
-        name = f"{city} – {random.choice(STOP_SUFFIXES)}"
-        if name not in _S.existing_stop_names:
-            return name
-    # Fallback: add a random suffix to guarantee uniqueness
-    return f"{random.choice(ISRAELI_CITIES)} – Stop-{random.randint(1000, 9999)}"
-
-
-def _gen_route_name() -> str:
-    for _ in range(2000):
-        prefix = random.choice(ROUTE_PREFIXES)
-        origin = random.choice(ISRAELI_CITIES)
-        dest   = random.choice([c for c in ISRAELI_CITIES if c != origin])
-        name   = f"{prefix}: {origin} → {dest}"
-        if name not in _S.existing_route_names:
-            return name
-    return f"Route-{random.randint(1000, 9999)}: {random.choice(ISRAELI_CITIES)} → {random.choice(ISRAELI_CITIES)}"
-
-
-def _gen_driver_fields() -> tuple[str, str]:
-    """Return (fullname, licenseType) not already in the DB."""
-    for _ in range(2000):
-        name  = _full_name()
-        ltype = random.choice(LICENSE_TYPES)
-        if (name, ltype) not in _S.existing_driver_keys:
-            return name, ltype
-    return f"Driver-{random.randint(1000, 9999)}", random.choice(LICENSE_TYPES)
-
-
-def _gen_trip_fields(trip_id: int) -> dict[str, Any] | None:
-    """Return trip field dict with a unique (date, route, driver) combo, or None."""
-    anchor = datetime.date(2024, 1, 1)
-    for _ in range(500):
-        route_id  = random.choice(_S.route_ids)
-        driver_id = random.choice(_S.driver_ids)
-        trip_date = anchor + datetime.timedelta(days=random.randint(0, 365))
-        key = (trip_date, route_id, driver_id)
-        if key not in _S.existing_trip_keys:
-            _S.existing_trip_keys.add(key)
-            _S.trip_route[trip_id] = route_id
-            return {
-                "trip_id":         trip_id,
-                "trip_date":       trip_date,
-                "departure_Time":  random.choice(DEPARTURE_TIMES),
-                "available_Seats": random.randint(1, 80),
-                "route_id":        route_id,
-                "driver_id":       driver_id,
-                "plate_number":    random.choice(_S.plate_numbers),
-            }
-    return None
-
-
-# ── Table seeders ─────────────────────────────────────────────────────────────
-
-def seed_table(cursor, table: str, count: int) -> tuple[int, int]:
-    """
-    Seed *count* new rows into *table*.
-    Returns (inserted, skipped).
-    """
-    t        = table.lower()
-    inserted = 0
-    skipped  = 0
-
-    # ── STOP ──────────────────────────────────────────────────────────────────
-    if t == "stop":
-        next_id = _next_id(cursor, "STOP", "stop_id")
-        for i in range(count):
-            sid  = next_id + i
-            name = _gen_stop_name()
-            if name in _S.existing_stop_names:
-                logger.debug("[STOP] SKIPPED existing stop_name '%s'.", name)
-                skipped += 1
-                continue
-            try:
-                _insert_row(cursor, "stop", {"stop_id": sid, "stop_name": name})
-                _S.stop_ids.append(sid)
-                _S.existing_stop_names.add(name)
-                logger.debug("[STOP] INSERTED stop_id=%d '%s'.", sid, name)
-                inserted += 1
-            except Exception as exc:
-                logger.error("[STOP] stop_id=%d skipped – %s", sid, exc)
-                skipped += 1
-
-    # ── ROUTE ─────────────────────────────────────────────────────────────────
-    elif t == "route":
-        next_id = _next_id(cursor, "ROUTE", "route_id")
-        for i in range(count):
-            rid  = next_id + i
-            name = _gen_route_name()
-            if name in _S.existing_route_names:
-                logger.debug("[ROUTE] SKIPPED existing route_name '%s'.", name)
-                skipped += 1
-                continue
-            try:
-                _insert_row(cursor, "route", {"route_name": name, "route_id": rid})
-                _S.route_ids.append(rid)
-                _S.existing_route_names.add(name)
-                logger.debug("[ROUTE] INSERTED route_id=%d '%s'.", rid, name)
-                inserted += 1
-            except Exception as exc:
-                logger.error("[ROUTE] route_id=%d skipped – %s", rid, exc)
-                skipped += 1
-
-    # ── DRIVER ────────────────────────────────────────────────────────────────
-    elif t == "driver":
-        next_id = _next_id(cursor, "DRIVER", "driver_id")
-        for i in range(count):
-            did   = next_id + i
-            name, ltype = _gen_driver_fields()
-            key   = (name, ltype)
-            if key in _S.existing_driver_keys:
-                logger.debug("[DRIVER] SKIPPED existing driver '%s'.", name)
-                skipped += 1
-                continue
-            try:
-                _insert_row(cursor, "driver", {
-                    "licenseType": ltype, "driver_fullname": name, "driver_id": did,
-                })
-                _S.driver_ids.append(did)
-                _S.existing_driver_keys.add(key)
-                logger.debug("[DRIVER] INSERTED driver_id=%d '%s'.", did, name)
-                inserted += 1
-            except Exception as exc:
-                logger.error("[DRIVER] driver_id=%d skipped – %s", did, exc)
-                skipped += 1
-
-    # ── VEHICLE ───────────────────────────────────────────────────────────────
-    elif t == "vehicle":
-        for _ in range(count):
-            try:
-                vtype = random.choice(VEHICLE_TYPES)
-                plate = _unique_plate()      # already guards against duplicates
-                _insert_row(cursor, "vehicle", {
-                    "capacity": CAPACITIES[vtype], "vehicle_type": vtype, "plate_number": plate,
-                })
-                _S.plate_numbers.append(plate)
-                logger.debug("[VEHICLE] INSERTED plate=%s.", plate)
-                inserted += 1
-            except Exception as exc:
-                logger.error("[VEHICLE] row skipped – %s", exc)
-                skipped += 1
-
-    # ── INCLUDES ──────────────────────────────────────────────────────────────
-    elif t == "includes":
-        if not _S.stop_ids or not _S.route_ids:
-            logger.warning("[INCLUDES] Requires STOP and ROUTE — skipping.")
-            return 0, 0
-        # Only assign stops to routes that are new this run (not already in route_stops)
-        new_routes = [r for r in _S.route_ids if r not in _S.route_stops]
-        for route_id in new_routes:
-            n      = random.randint(3, min(6, len(_S.stop_ids)))
-            chosen = random.sample(_S.stop_ids, n)
-            _S.route_stops[route_id] = chosen
-            for stop_id in chosen:
-                pair = (route_id, stop_id)
-                if pair in _S.existing_includes:
-                    logger.debug("[INCLUDES] SKIPPED existing (%d, %d).", route_id, stop_id)
-                    skipped += 1
-                    continue
-                try:
-                    _insert_row(cursor, "includes", {"route_id": route_id, "stop_id": stop_id})
-                    _S.existing_includes.add(pair)
-                    logger.debug("[INCLUDES] INSERTED route=%d stop=%d.", route_id, stop_id)
-                    inserted += 1
-                except Exception as exc:
-                    logger.error("[INCLUDES] (%d,%d) skipped – %s", route_id, stop_id, exc)
-                    skipped += 1
-
-    # ── TRIP ──────────────────────────────────────────────────────────────────
-    elif t == "trip":
-        if not (_S.route_ids and _S.driver_ids and _S.plate_numbers):
-            logger.warning("[TRIP] Requires ROUTE, DRIVER, VEHICLE — skipping.")
-            return 0, 0
-        next_id = _next_id(cursor, "TRIP", "trip_id")
-        attempts = 0
-        i = 0
-        while i < count and attempts < count * 10:
-            attempts += 1
-            tid = next_id + i
-            fields = _gen_trip_fields(tid)
-            if fields is None:
-                logger.warning("[TRIP] Could not find unique (date,route,driver) after retries.")
-                skipped += 1
-                i += 1
-                continue
-            try:
-                _insert_row(cursor, "trip", fields)
-                _S.trip_ids.append(tid)
-                logger.debug("[TRIP] INSERTED trip_id=%d.", tid)
-                inserted += 1
-                i += 1
-            except Exception as exc:
-                logger.error("[TRIP] trip_id=%d skipped – %s", tid, exc)
-                skipped += 1
-                i += 1
-
-    # ── PASSENGER ─────────────────────────────────────────────────────────────
-    elif t == "passenger":
-        next_id = _next_id(cursor, "PASSENGER", "pass_id")
-        for i in range(count):
-            pid  = next_id + i
-            name = _full_name()
-            email = _unique_email(name, pid)
-            phone = _unique_phone(pid)
-            try:
-                _insert_row(cursor, "passenger", {
-                    "email": email, "phone": phone,
-                    "pass_fullname": name, "pass_id": pid,
-                    "sector": random.choice(SECTORS + [None]),
-                })
-                _S.passenger_ids.append(pid)
-                logger.debug("[PASSENGER] INSERTED pass_id=%d.", pid)
-                inserted += 1
-            except Exception as exc:
-                logger.error("[PASSENGER] pass_id=%d skipped – %s", pid, exc)
-                skipped += 1
-
-    # ── REGISTRATION ──────────────────────────────────────────────────────────
-    elif t == "registration":
-        if not (_S.trip_ids and _S.passenger_ids):
-            logger.warning("[REGISTRATION] Requires TRIP and PASSENGER — skipping.")
-            return 0, 0
-        next_id = _next_id(cursor, "REGISTRATION", "reg_id")
-        reg_id  = next_id
-        # Only register passengers onto trips that were inserted this run
-        new_trips = [tid for tid in _S.trip_ids
-                     if tid >= (_next_id(cursor, "TRIP", "trip_id") - len(_S.trip_ids))]
-        # Simpler: iterate all trips and register a few random passengers each
-        for trip_id in _S.trip_ids:
-            route_id    = _S.trip_route.get(trip_id)
-            route_stops = _S.route_stops.get(route_id, _S.stop_ids[:2] or [1])
-            max_regs    = random.randint(0, min(8, len(_S.passenger_ids)))
-            candidates  = random.sample(_S.passenger_ids, min(max_regs, len(_S.passenger_ids)))
-            for pass_id in candidates:
-                pair = (pass_id, trip_id)
-                if pair in _S.existing_reg_pairs:
-                    logger.debug("[REGISTRATION] SKIPPED existing (pass=%d, trip=%d).",
-                                 pass_id, trip_id)
-                    skipped += 1
-                    continue
-                stops    = route_stops if route_stops else _S.stop_ids[:1]
-                boarding, dropoff = (random.sample(stops, 2) if len(stops) >= 2
-                                     else (stops[0], stops[0]))
-                try:
-                    _insert_row(cursor, "registration", {
-                        "reg_id":           reg_id,
-                        "status":           random.choice(REG_STATUSES),
-                        "pass_id":          pass_id,
-                        "trip_id":          trip_id,
-                        "boarding_stop_id": boarding,
-                        "dropoff_stop_id":  dropoff,
-                    })
-                    _S.existing_reg_pairs.add(pair)
-                    reg_id += 1
-                    inserted += 1
-                except Exception as exc:
-                    logger.error("[REGISTRATION] reg_id=%d skipped – %s", reg_id, exc)
-                    skipped += 1
-
-    return inserted, skipped
-
-
-# ── Reset helper ──────────────────────────────────────────────────────────────
-
-def reset_database(cursor) -> None:
-    """Delete all rows from every table in FK-safe reverse order."""
-    logger.warning("──── RESET: deleting all rows from all tables ────")
-    for table in RESET_ORDER:
-        cursor.execute(f'DELETE FROM "{table.upper()}"')
-        logger.info("[RESET] Cleared table %s.", table.upper())
-
-
-# ── Main ──────────────────────────────────────────────────────────────────────
-
-def main() -> None:
-    parser = argparse.ArgumentParser(
-        description=(
-            "RideFlow idempotent PostgreSQL seeder.\n"
-            "Safe to run on empty OR populated databases."
-        ),
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=__doc__,
-    )
-    parser.add_argument(
-        "--counts", nargs="+", metavar="TABLE=N", default=[],
-        help="Additional rows to insert per table, e.g. --counts stop=30 trip=50",
-    )
-    parser.add_argument(
-        "--tables", nargs="+", metavar="TABLE", default=TABLE_ORDER,
-        help=f"Tables to seed. Choices: {', '.join(TABLE_ORDER)}",
-    )
-    parser.add_argument(
-        "--seed", type=int, default=None, metavar="INT",
-        help="Random seed for reproducible output.",
-    )
-    parser.add_argument(
-        "--reset", action="store_true",
-        help="Delete ALL existing data then insert a fresh dataset.",
-    )
-    args = parser.parse_args()
-
-    _init_faker(args.seed)
-    if not _FAKER_AVAILABLE:
-        logger.warning("Faker not installed – using built-in lists. "
-                       "Install with:  pip install faker")
-
-    # Parse --counts
-    counts = dict(DEFAULT_COUNTS)
-    for item in args.counts:
-        if "=" not in item:
-            logger.error("Invalid --counts entry %r (expected TABLE=N)", item)
-            sys.exit(1)
-        tbl, _, n = item.partition("=")
-        if tbl.lower() not in counts:
-            logger.error("Unknown table %r. Choices: %s", tbl, list(counts))
-            sys.exit(1)
-        counts[tbl.lower()] = int(n)
-
-    # Expand with required parent tables
-    deps: dict[str, set[str]] = {
-        "stop":         set(),
-        "route":        set(),
-        "driver":       set(),
-        "vehicle":      set(),
-        "includes":     {"stop", "route"},
-        "trip":         {"route", "driver", "vehicle"},
-        "passenger":    set(),
-        "registration": {"trip", "passenger", "stop", "route", "includes"},
-    }
-    to_seed: set[str] = {t.lower() for t in args.tables}
-    changed = True
-    while changed:
-        changed = False
-        for tbl in list(to_seed):
-            for parent in deps.get(tbl, set()):
-                if parent not in to_seed:
-                    logger.info("Auto-adding required parent table '%s'.", parent)
-                    to_seed.add(parent)
-                    changed = True
-
-    # ── Connect ───────────────────────────────────────────────────────────────
-    conn   = get_connection()
-    cursor = conn.cursor()
-
+    sampled_data = {}
     try:
-        # Optional wipe
-        if args.reset:
-            reset_database(cursor)
-
-        # Pre-load existing state (skipped when --reset clears everything)
-        if not args.reset:
-            preload_existing_state(cursor)
-
-        # ── Seed ──────────────────────────────────────────────────────────────
-        grand_inserted = 0
-        grand_skipped  = 0
-
-        for table in TABLE_ORDER:
-            if table not in to_seed:
+        query = text(f'SELECT * FROM "{table_name}" LIMIT 200')
+        result = connection.execute(query).fetchall()
+        if not result:
+            return sampled_data
+            
+        for c_idx, col in enumerate(columns):
+            col_name = col['name']
+            values = [row[c_idx] for row in result if row[c_idx] is not None]
+            if not values:
                 continue
-            n = counts.get(table, 0)
-            logger.info("── Seeding %s (target: %s new rows) ──",
-                        table.upper(), n if n else "auto")
-            ins, skp = seed_table(cursor, table, n)
-            logger.info("   ✓ %s — INSERTED: %d  SKIPPED: %d", table.upper(), ins, skp)
-            grand_inserted += ins
-            grand_skipped  += skp
+            unique_values = set(values)
+            if len(unique_values) <= 15 and len(values) >= len(unique_values):
+                str_type = str(col['type']).upper()
+                if 'VARCHAR' in str_type or 'TEXT' in str_type or 'CHAR' in str_type:
+                    sampled_data[col_name] = list(unique_values)
+    except Exception:
+        pass
+    return sampled_data
 
-        conn.commit()
-        logger.info(
-            "══ Done. TOTAL INSERTED: %d  TOTAL SKIPPED: %d ══",
-            grand_inserted, grand_skipped,
-        )
+def generate_fake_data(col_name, col_type, constraints_map, sampled_data):
+    """Generate realistic data based on constraints, existing data, or intelligent faker mapping."""
+    if col_name in constraints_map and constraints_map[col_name]:
+        return random.choice(constraints_map[col_name])
+    if col_name in sampled_data and sampled_data[col_name]:
+        return random.choice(sampled_data[col_name])
+        
+    name_lower = col_name.lower()
+    type_str = str(col_type).upper()
+    
+    max_length = 255
+    match = re.search(r'\((\d+)\)', type_str)
+    if match:
+        max_length = int(match.group(1))
+        
+    val = None
+    
+    # Adding large random suffix to unique fields to ensure no collisions
+    if 'email' in name_lower:
+        val = f"{fake.user_name()}_{random.randint(100000, 9999999)}@{fake.free_email_domain()}"
+    elif 'phone' in name_lower:
+        val = f"05{random.randint(0,9)}-{random.randint(1000000, 9999999)}"
+    elif 'name' in name_lower or 'fullname' in name_lower:
+        val = fake.name()
+    elif 'date' in name_lower and 'time' not in name_lower:
+        val = fake.date_this_year()
+    elif 'time' in name_lower and 'date' not in name_lower:
+        val = fake.time()  # e.g., '14:30:00'
+    elif 'plate' in name_lower or 'license_plate' in name_lower:
+        if random.choice([True, False]): 
+            val = f"{random.randint(10, 99)}-{random.randint(100, 999)}-{random.randint(10, 99)}"
+        else:
+            val = f"{random.randint(100, 999)}-{random.randint(10, 99)}-{random.randint(100, 999)}"
+    elif 'id_number' in name_lower or 'tz' in name_lower:
+        val = str(random.randint(100000000, 999999999))
+    elif 'capacity' in name_lower:
+        val = random.choice([10, 15, 20, 25, 40, 50, 60, 80])
+    elif 'VARCHAR' in type_str or 'TEXT' in type_str or 'CHAR' in type_str:
+        val = f"{fake.word()}{random.randint(1, 9999)}"
+    elif 'INT' in type_str:
+        val = random.randint(10000, 999999)
+    elif 'BOOL' in type_str:
+        val = fake.boolean()
+    elif 'DATE' in type_str:
+        val = fake.date_this_year()
+    elif 'TIMESTAMP' in type_str:
+        val = fake.date_time_this_year()
+    elif 'FLOAT' in type_str or 'NUMERIC' in type_str or 'DECIMAL' in type_str:
+        val = round(random.uniform(1.0, 1000.0), 2)
+    else:
+        val = fake.word()
+        
+    # Strictly truncate string variables that exceed max_length
+    if isinstance(val, str) and len(val) > max_length:
+        val = val[:max_length]
+        
+    return val
 
-    except Exception as exc:
-        conn.rollback()
-        logger.error("Fatal error – transaction rolled back: %s", exc)
-        sys.exit(1)
-    finally:
-        cursor.close()
-        conn.close()
-        logger.info("Database connection closed.")
+def get_table_dependencies(inspector):
+    """Retrieve foreign key dependencies as a map: {child_table: set(parent_tables)}."""
+    tables = inspector.get_table_names()
+    deps = {t: set() for t in tables}
+    for t in tables:
+        for fk in inspector.get_foreign_keys(t):
+            if fk['referred_table'] != t:
+                deps[t].add(fk['referred_table'])
+    return deps
 
+def topological_sort(tables_to_sort, deps):
+    """Sort table generation order based on foreign key dependencies using topological sort."""
+    result = []
+    visited = set()
+    visiting = set()
+    
+    def visit(node):
+        if node in visiting: return
+        if node in visited: return
+        visiting.add(node)
+        for dep in deps.get(node, set()):
+            visit(dep)
+        visiting.remove(node)
+        visited.add(node)
+        result.append(node)
+        
+    for t in tables_to_sort:
+        visit(t)
+        
+    return [t for t in result if t in tables_to_sort]
+
+def generate_for_table(selected_table, num_rows, inspector, connection):
+    print(f"\n[+] Processing {selected_table}...")
+    
+    pk_constraint = inspector.get_pk_constraint(selected_table)
+    pk_cols = pk_constraint['constrained_columns'] if pk_constraint else []
+    fks = inspector.get_foreign_keys(selected_table)
+    fk_dict = {} 
+    
+    for fk in fks:
+        for constrained_col, referred_col in zip(fk['constrained_columns'], fk['referred_columns']):
+            fk_dict[constrained_col] = (fk['referred_table'], referred_col)
+            
+    columns = inspector.get_columns(selected_table)
+    constraints_map = analyze_check_constraints(inspector, selected_table)
+    sampled_data = sample_existing_data(connection, selected_table, columns)
+        
+    # Pre-fetch existing primary keys if it's a single PK column system
+    existing_pks = set()
+    if len(pk_cols) == 1:
+        pk_col = pk_cols[0]
+        try:
+            query = text(f'SELECT "{pk_col}" FROM "{selected_table}"')
+            existing_pks = {row[0] for row in connection.execute(query).fetchall()}
+        except SQLAlchemyError:
+            pass
+            
+    success_count = 0
+    skipped_count = 0
+    
+    for i in range(num_rows):
+        row_data = {}
+        skip_table = False
+        
+        for col in columns:
+            col_name = col['name']
+            col_type = col['type']
+            
+            # 1. Skip auto-incrementing/serial primary keys
+            if col_name in pk_cols and col.get('autoincrement') == True:
+                continue
+                
+            # 2. Foreign Keys (Strict Bounds: Existing Only)
+            if col_name in fk_dict:
+                ref_table, ref_col = fk_dict[col_name]
+                fk_val = get_random_fk_value(connection, ref_table, ref_col)
+                if fk_val is None:
+                    if i == 0:
+                        print(f"    --> Error: Parent table '{ref_table}' is empty. Please fill table '{ref_table}' first.")
+                    skip_table = True
+                    break
+                row_data[col_name] = fk_val
+                continue
+                
+            # 3. Pure Mock High-Range for Non-Auto-Incrementing PKs (Avoiding MAX+1)
+            if col_name in pk_cols:
+                type_str = str(col_type).upper()
+                pk_val = None
+                for _ in range(50):
+                    if 'INT' in type_str:
+                        pk_val = random.randint(10000, 999999)
+                    else:
+                        pk_val = generate_fake_data(col_name, col_type, constraints_map, sampled_data)
+                    
+                    if pk_val not in existing_pks:
+                        break
+                existing_pks.add(pk_val)
+                row_data[col_name] = pk_val
+                continue
+                
+            # 4. Randomness with Constraints
+            if hasattr(col_type, 'enums') and col_type.enums:
+                row_data[col_name] = random.choice(col_type.enums)
+            else:
+                row_data[col_name] = generate_fake_data(col_name, col_type, constraints_map, sampled_data)
+                
+        if skip_table:
+            # Table is fully skipped due to missing parent data
+            skipped_count += (num_rows - i)
+            break
+            
+        cols_str = ', '.join([f'"{k}"' for k in row_data.keys()])
+        params_str = ', '.join([f':{k}' for k in row_data.keys()])
+        query = text(f'INSERT INTO "{selected_table}" ({cols_str}) VALUES ({params_str})')
+        
+        try:
+            with connection.begin_nested():
+                connection.execute(query, row_data)
+            success_count += 1
+        except IntegrityError:
+            skipped_count += 1
+        except SQLAlchemyError:
+            skipped_count += 1
+            
+    # Quiet Mode Single Output
+    print(f"    [Result] Success: {success_count} | Failed/Skipped: {skipped_count}")
+
+def main():
+    inspector = inspect(engine)
+    all_tables = inspector.get_table_names()
+    
+    if not all_tables:
+        print("No tables found in the database. Please ensure your schema is set up.")
+        return
+
+    deps = get_table_dependencies(inspector)
+    
+    print("\n=============================================")
+    print(" Welcome to RideFlow DB Data Generator UI")
+    print("=============================================\n")
+    
+    while True:
+        print("\nAvailable tables:")
+        for i, t in enumerate(all_tables, 1):
+            print(f"{i}. {t}")
+            
+        print("\nOptions:")
+        print(" - Enter numbers separated by comma (e.g., '1, 3, 5')")
+        print(" - Enter 'A' to generate data for ALL tables")
+        print(" - Enter 'q' or '0' to Quit")
+        
+        user_input = input("\nSelect your choice: ").strip().lower()
+        
+        if user_input in ('q', '0', 'quit', 'exit'):
+            print("Exiting generator. Goodbye!")
+            break
+            
+        selected_tables = []
+        if user_input == 'a':
+            selected_tables = all_tables
+        else:
+            indices = [x.strip() for x in user_input.split(',') if x.strip()]
+            for idx_str in indices:
+                try:
+                    idx = int(idx_str) - 1
+                    if 0 <= idx < len(all_tables):
+                        if all_tables[idx] not in selected_tables:
+                            selected_tables.append(all_tables[idx])
+                    else:
+                        print(f"Warning: Index '{idx_str}' is out of range.")
+                except ValueError:
+                    print(f"Warning: '{idx_str}' is not a valid number.")
+                    
+        if not selected_tables:
+            print("No valid tables selected. Try again.")
+            continue
+            
+        ordered_tables = topological_sort(selected_tables, deps)
+            
+        # Ask for row counts
+        table_row_counts = {}
+        if len(ordered_tables) > 1:
+            ans = input("\nGenerate the SAME number of rows for all selected tables? (y/n) [default: y]: ").strip().lower()
+            if ans != 'n':
+                try:
+                    num = int(input("How many rows per table? "))
+                    if num <= 0: raise ValueError
+                    table_row_counts = {t: num for t in ordered_tables}
+                except ValueError:
+                    print("Invalid input. Cancelling generation.")
+                    continue
+            else:
+                for t in ordered_tables:
+                    try:
+                        num = int(input(f"Rows to generate for '{t}': "))
+                        if num <= 0: raise ValueError
+                        table_row_counts[t] = num
+                    except ValueError:
+                        print("Invalid input. Cancelling generation.")
+                        table_row_counts = {}
+                        break
+        else:
+            try:
+                num = int(input(f"\nHow many rows to insert into '{ordered_tables[0]}'? "))
+                if num <= 0: raise ValueError
+                table_row_counts[ordered_tables[0]] = num
+            except ValueError:
+                print("Invalid input. Cancelling generation.")
+                continue
+                
+        if not table_row_counts:
+            continue
+            
+        with engine.connect() as connection:
+            for table in ordered_tables:
+                num_rows = table_row_counts[table]
+                if num_rows > 0:
+                    generate_for_table(table, num_rows, inspector, connection)
+            connection.commit()
 
 if __name__ == "__main__":
     main()
