@@ -288,18 +288,6 @@ CHECK (available_seats >= 0);
 ---
 
 ## 6. אינדקסים (Indexes)
-
-### אינדקס על תאריך נסיעה (`trip_date`)
-**לפני האינדקס:** זמן ריצה ארוך עקב סריקה מלאה של הטבלה.
-**אחרי האינדקס:** זמן הריצה התקצר משמעותית.
-![ביצועי אינדקס תאריך](screenshots/Screenshot%202026-05-06%20024138.png)
- העדכון](file:///c:/screenshotsEx2/Screenshot%202026-05-06%20005314.png)
-
-### מחיקה 1: מחיקת נהגים ללא שיבוץ
-**תיאור:** הסרת נהגים מהמערכת שמעולם לא שובצו לנסיעה.
-```sql
-DELETE FROM public.driver 
-WHERE driver_id NOT IN (SELECT DISTINCT driver_id FROM public.trip);
 ```
 ![לפני המחיקה](file:///c:/screenshotsEx2/Screenshot%202026-05-06%20011442.png)
 ![אחרי המחיקה](file:///c:/screenshotsEx2/Screenshot%202026-05-06%20011454.png)
@@ -334,13 +322,15 @@ CHECK (available_seats >= 0);
 
 ### הדגמת Rollback
 **תהליך:** פתיחת טרנזקציה, שינוי סוג רישיון לנהג, בדיקת השינוי הזמני, וביצוע ביטול (Rollback).
-![מהלך הטרנזקציה](file:///c:/screenshotsEx2/Screenshot%202026-05-06%20022638.png)
-![אחרי Rollback](file:///c:/screenshotsEx2/Screenshot%202026-05-06%20022645.png)
+![מהלך הטרנזקציה](screenshots/Screenshot%202026-05-06%20022638.png)
+![אחרי Rollback](screenshots/Screenshot%202026-05-06%20022645.png)
+
+**הסבר:** לאחר הביטול (Rollback) הנתונים חזרו למצב הקודם ללא שינוי.
 
 ### הדגמת Commit
 **תהליך:** עדכון קיבולת רכב בתוך טרנזקציה ואישור השינוי לצמיתות.
-![לפני ה-Commit](file:///c:/screenshotsEx2/Screenshot%202026-05-06%20023000.png)
-![אחרי ה-Commit](file:///c:/screenshotsEx2/Screenshot%202026-05-06%20023009.png)
+![לפני ה-Commit](screenshots/Screenshot%202026-05-06%20023000.png)
+![אחרי ה-Commit](screenshots/Screenshot%202026-05-06%20023009.png)
 
 ---
 
@@ -349,6 +339,6 @@ CHECK (available_seats >= 0);
 ### אינדקס על תאריך נסיעה (`trip_date`)
 **לפני האינדקס:** זמן ריצה ארוך עקב סריקה מלאה של הטבלה.
 **אחרי האינדקס:** זמן הריצה התקצר משמעותית.
-![ביצועי אינדקס תאריך](file:///c:/screenshotsEx2/Screenshot%202026-05-06%20024138.png)
+![ביצועי אינדקס תאריך](screenshots/Screenshot%202026-05-06%20024138.png)
 
 **הסבר:** האינדקס משפר את ביצועי השאילתות על ידי יצירת מבנה נתונים מסודר המאפשר חיפוש לוגריתמי במקום ליניארי.
