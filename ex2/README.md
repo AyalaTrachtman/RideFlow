@@ -304,7 +304,7 @@ ADD CONSTRAINT check_capacity_positive
 CHECK (capacity > 0);
 ```
 **ניסיון הפרה (הכנסת ערך 0):**
-![שגיאת אילוץ קיבולת](file:///c:/screenshotsEx2/Screenshot%202026-05-06%20012304.png)
+![שגיאת אילוץ קיבולת](screenshots/Screenshot%202026-05-06%20012304.png)
 
 ### אילוץ 2: מקומות פנויים לא שליליים
 **תיאור:** מניעת מצב של רישום יתר (Overbooking).
@@ -314,7 +314,7 @@ ADD CONSTRAINT check_available_seats_non_negative
 CHECK (available_seats >= 0);
 ```
 **ניסיון הפרה (הכנסת ערך שלילי):**
-![שגיאת אילוץ מקומות פנויים](file:///c:/screenshotsEx2/Screenshot%202026-05-06%20012313.png)
+![שגיאת אילוץ מקומות פנויים](screenshots/Screenshot%202026-05-06%20012313.png)
 
 ---
 
