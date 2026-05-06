@@ -53,8 +53,8 @@ ORDER BY t.trip_id;
 ```
 
 **צילומי מסך:**
-![שאילתה 1 צורה א'](file:///c:/screenshotsEx2/Screenshot%202026-05-06%20083734.png)
-![שאילתה 1 צורה ב'](file:///c:/screenshotsEx2/Screenshot%202026-05-06%20083746.png)
+![שאילתה 1 צורה א'](screenshots/Screenshot%202026-05-06%20083734.png)
+![שאילתה 1 צורה ב'](screenshots/Screenshot%202026-05-06%20083746.png)
 
 **הסבר טכני והשוואת יעילות:**
 צורה א' משתמשת ב-`JOIN` ו-`GROUP BY` המאפשרים למנוע מסד הנתונים לבצע את החישוב בצורה אגרגטיבית ויעילה יותר על ידי סריקה מרוכזת של הטבלאות. צורה ב' משתמשת ב-`Correlated Sub-query` בתוך ה-SELECT וה-WHERE, מה שעלול לגרום להרצת תת-השאילתה עבור כל שורה בטבלה הראשית (O(N^2) במקרים מסוימים). לכן, צורה א' יעילה יותר בבסיסי נתונים גדולים.
@@ -91,8 +91,8 @@ WHERE (
 ```
 
 **צילומי מסך:**
-![שאילתה 2 צורה א'](file:///c:/screenshotsEx2/Screenshot%202026-05-06%20081907.png)
-![שאילתה 2 צורה ב'](file:///c:/screenshotsEx2/Screenshot%202026-05-06%20081937.png)
+![שאילתה 2 צורה א'](screenshots/Screenshot%202026-05-06%20081907.png)
+![שאילתה 2 צורה ב'](screenshots/Screenshot%202026-05-06%20081937.png)
 
 **הסבר טכני והשוואת יעילות:**
 צורה א' מנצלת את מנגנון ה-Hash Aggregate או Sort Aggregate של מסד הנתונים לאחר ה-Join, מה שחוסך זמן ריצה. צורה ב' מחשבת את ה-Count פעמיים (פעם אחת להצגה ופעם אחת לסינון), מה שגורם לכפילות מיותרת בעבודה.
@@ -129,8 +129,8 @@ ORDER BY driver_fullname;
 ```
 
 **צילומי מסך:**
-![שאילתה 3 צורה א'](file:///c:/screenshotsEx2/Screenshot%202026-05-06%20083933.png)
-![שאילתה 3 צורה ב'](file:///c:/screenshotsEx2/Screenshot%202026-05-06%20083946.png)
+![שאילתה 3 צורה א'](screenshots/Screenshot%202026-05-06%20083933.png)
+![שאילתה 3 צורה ב'](screenshots/Screenshot%202026-05-06%20083946.png)
 
 **הסבר טכני והשוואת יעילות:**
 בשאילתה זו, ה-`JOIN` (צורה א') לרוב עדיף כיוון שאופטימייזרים מודרניים יודעים לבצע `Nested Loops` או `Hash Join` בצורה מיטבית. עם זאת, בשימוש ב-`IN` (צורה ב'), אם רשימת הלוחיות הפנימית קטנה מאוד, הביצועים עשויים להיות דומים. בדרך כלל נעדיף JOIN לקריאות ויעילות.
@@ -165,8 +165,8 @@ ORDER BY r.route_name, r.route_id;
 ```
 
 **צילומי מסך:**
-![שאילתה 4 צורה א'](file:///c:/screenshotsEx2/Screenshot%202026-05-06%20091529.png)
-![שאילתה 4 צורה ב'](file:///c:/screenshotsEx2/Screenshot%202026-05-06%20091537.png)
+![שאילתה 4 צורה א'](screenshots/Screenshot%202026-05-06%20091529.png)
+![שאילתה 4 צורה ב'](screenshots/Screenshot%202026-05-06%20091537.png)
 
 **הסבר טכני והשוואת יעילות:**
 צורה א' משתמשת ב-`LEFT JOIN` המבטיח שגם מסלולים ללא הרשמות יופיעו (עם ערך 0). צורה ב' מבצעת תת-שאילתה מקוננת פעמיים (אחת בתוך השנייה) לכל שורה בטבלת המסלולים, מה שיוצר עומס כבד מאוד על המעבד ככל שכמות הנתונים גדלה.
@@ -183,7 +183,7 @@ SELECT EXTRACT(DOW FROM trip_date) as day_of_week,
 FROM public.trip 
 GROUP BY day_of_week;
 ```
-![שאילתה 5](file:///c:/screenshotsEx2/Screenshot%202026-05-06%20091512.png)
+![שאילתה 5](screenshots/Screenshot%202026-05-06%20091512.png)
 
 ### שאילתה 6: איתור נוסעים "מתמידים" (מעל 5 הרשמות)
 **תיאור:** רשימת נוסעים שנרשמו ליותר מ-5 נסיעות שונות.
@@ -195,7 +195,7 @@ JOIN public.registration r ON p.pass_id = r.pass_id
 GROUP BY p.pass_fullname 
 HAVING COUNT(r.reg_id) > 5;
 ```
-![שאילתה 6](file:///c:/screenshotsEx2/Screenshot%202026-05-06%20005012.png)
+![שאילתה 6](screenshots/Screenshot%202026-05-06%20005012.png)
 
 ### שאילתה 7: נסיעות עם מעט מקומות פנויים
 **תיאור:** הצגת נסיעות שנותרו בהן פחות מ-2 מקומות פנויים.
@@ -207,7 +207,7 @@ FROM public.trip t
 JOIN public.route r ON t.route_id = r.route_id
 WHERE t.available_seats < 2;
 ```
-![שאילתה 7](file:///c:/screenshotsEx2/Screenshot%202026-05-06%20005044.png)
+![שאילתה 7](screenshots/Screenshot%202026-05-06%20005044.png)
 
 ### שאילתה 8: רשימת תחנות ומסלוליהן
 **תיאור:** הצגת כל התחנות והמסלולים שבהן הן עוברות, ממוין לפי שם מסלול.
@@ -219,7 +219,7 @@ JOIN public.includes i ON s.stop_id = i.stop_id
 JOIN public.route r ON i.route_id = r.route_id
 ORDER BY r.route_name ASC;
 ```
-![שאילתה 8](file:///c:/screenshotsEx2/Screenshot%202026-05-06%20005255.png)
+![שאילתה 8](screenshots/Screenshot%202026-05-06%20005255.png)
 
 ---
 
@@ -236,7 +236,64 @@ WHERE trip_id IN (
     WHERE trip_date < CURRENT_DATE
 );
 ```
-![ביצוע העדכון](file:///c:/screenshotsEx2/Screenshot%202026-05-06%20005314.png)
+![ביצוע העדכון](screenshots/Screenshot%202026-05-06%20005314.png)
+
+### מחיקה 1: מחיקת נהגים ללא שיבוץ
+**תיאור:** הסרת נהגים מהמערכת שמעולם לא שובצו לנסיעה.
+```sql
+DELETE FROM public.driver 
+WHERE driver_id NOT IN (SELECT DISTINCT driver_id FROM public.trip);
+```
+![לפני המחיקה](screenshots/Screenshot%202026-05-06%20011442.png)
+![אחרי המחיקה](screenshots/Screenshot%202026-05-06%20011454.png)
+
+---
+
+## 4. אילוצי שלמות (Constraints)
+
+### אילוץ 1: קיבולת רכב חיובית
+**תיאור:** הוספת אילוץ המבטיח שקיבולת הרכב תהיה גדולה מ-0.
+```sql
+ALTER TABLE public.vehicle 
+ADD CONSTRAINT check_capacity_positive 
+CHECK (capacity > 0);
+```
+**ניסיון הפרה (הכנסת ערך 0):**
+![שגיאת אילוץ קיבולת](screenshots/Screenshot%202026-05-06%20012304.png)
+
+### אילוץ 2: מקומות פנויים לא שליליים
+**תיאור:** מניעת מצב של רישום יתר (Overbooking).
+```sql
+ALTER TABLE public.trip 
+ADD CONSTRAINT check_available_seats_non_negative 
+CHECK (available_seats >= 0);
+```
+**ניסיון הפרה (הכנסת ערך שלילי):**
+![שגיאת אילוץ מקומות פנויים](screenshots/Screenshot%202026-05-06%20012313.png)
+
+---
+
+## 5. טרנזקציות (Rollback & Commit)
+
+### הדגמת Rollback
+**תהליך:** פתיחת טרנזקציה, שינוי סוג רישיון לנהג, בדיקת השינוי הזמני, וביצוע ביטול (Rollback).
+![מהלך הטרנזקציה](screenshots/Screenshot%202026-05-06%20022638.png)
+![אחרי Rollback](screenshots/Screenshot%202026-05-06%20022645.png)
+
+### הדגמת Commit
+**תהליך:** עדכון קיבולת רכב בתוך טרנזקציה ואישור השינוי לצמיתות.
+![לפני ה-Commit](screenshots/Screenshot%202026-05-06%20023000.png)
+![אחרי ה-Commit](screenshots/Screenshot%202026-05-06%20023009.png)
+
+---
+
+## 6. אינדקסים (Indexes)
+
+### אינדקס על תאריך נסיעה (`trip_date`)
+**לפני האינדקס:** זמן ריצה ארוך עקב סריקה מלאה של הטבלה.
+**אחרי האינדקס:** זמן הריצה התקצר משמעותית.
+![ביצועי אינדקס תאריך](screenshots/Screenshot%202026-05-06%20024138.png)
+ העדכון](file:///c:/screenshotsEx2/Screenshot%202026-05-06%20005314.png)
 
 ### מחיקה 1: מחיקת נהגים ללא שיבוץ
 **תיאור:** הסרת נהגים מהמערכת שמעולם לא שובצו לנסיעה.
