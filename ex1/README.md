@@ -58,13 +58,13 @@
 המסכים עוצבו ונבנו בסיוע כלי בינה מלאכותית, ומדמים את ממשק המשתמש הצפוי במערכת.
 
 ### מסך נסיעות זמינות
-![מסך נסיעות](screemshots/WhatsApp%20Image%202026-04-15%20at%2014.32.19.jpeg)
+![מסך נסיעות](screenshots/WhatsApp%20Image%202026-04-15%20at%2014.32.19.jpeg)
 
 ### מסך דשבורד נתונים
-![מסך דשבורד](screemshots/WhatsApp%20Image%202026-04-15%20at%2014.33.07.jpeg)
+![מסך דשבורד](screenshots/WhatsApp%20Image%202026-04-15%20at%2014.33.07.jpeg)
 
 ### מסך ההרשמות שלי
-![מסך ההרשמות](screemshots/WhatsApp%20Image%202026-04-15%20at%2014.33.30.jpeg)
+![מסך ההרשמות](screenshots/WhatsApp%20Image%202026-04-15%20at%2014.33.30.jpeg)
 
 ---
 
@@ -79,20 +79,20 @@
 ### תרשים ERD — Entity Relationship Diagram
 > מתאר את הישויות הלוגיות של המערכת ואת הקשרים ביניהן
 
-![תרשים ERD](screemshots/WhatsApp%20Image%202026-04-15%20at%2014.34.19.jpeg)
+![תרשים ERD](screenshots/WhatsApp%20Image%202026-04-15%20at%2014.34.19.jpeg)
 
 ---
 
 ### תרשים DSD — Data Structure Diagram
 > מתאר את מבנה הטבלאות הפיזי, שדות המפתח וקשרי ה-FK
 
-![תרשים DSD](screemshots/WhatsApp%20Image%202026-04-15%20at%2014.34.06.jpeg)
+![תרשים DSD](screenshots/WhatsApp%20Image%202026-04-15%20at%2014.34.06.jpeg)
 
 ---
 
 ### תרשים DSD — מתוך pgAdmin
 
-![תרשים DSD pgAdmin](screemshots/%D7%A6%D7%99%D7%9C%D7%95%D7%9D%20%D7%9E%D7%A1%D7%9A%202026-04-15%20141601.png)
+![תרשים DSD pgAdmin](screenshots/%D7%A6%D7%99%D7%9C%D7%95%D7%9D%20%D7%9E%D7%A1%D7%9A%202026-04-15%20141601.png)
 
 ---
 
@@ -125,25 +125,25 @@
 ### שיטה 1: כלי Mockaroo — יצירת נתוני דמי אוטומטית
 יצירת נתונים אקראיים ריאליסטיים לטבלאות בפורמט CSV דרך האתר [mockaroo.com](https://mockaroo.com).
 
-![שיטה 1 - Mockaroo](screemshots/WhatsApp%20Image%202026-04-15%20at%2014.42.13.jpeg)
+![שיטה 1 - Mockaroo](screenshots/WhatsApp%20Image%202026-04-15%20at%2014.42.13.jpeg)
 
 ---
 
 ### שיטה 2: ייבוא קובץ CSV דרך pgAdmin (Import/Export)
 ייבוא קבצי ה-CSV שנוצרו ב-Mockaroo ישירות אל תוך הטבלאות במסד הנתונים PostgreSQL דרך ממשק pgAdmin.
 
-![שיטה 2 - Import CSV](screemshots/WhatsApp%20Image%202026-04-15%20at%2014.43.37.jpeg)
+![שיטה 2 - Import CSV](screenshots/WhatsApp%20Image%202026-04-15%20at%2014.43.37.jpeg)
 
 ---
 
 ### שיטה 3: Python Script — סקריפט Python לייצור נתונים
 סקריפט Python ייעודי (`generate_data.py`) שמאפשר לבחור טבלה, כמות שורות, ומוסיף נתונים ישירות לבסיס הנתונים.
 
-![שיטה 3 - Python Script](screemshots/WhatsApp%20Image%202026-04-15%20at%2014.51.15.jpeg)
+![שיטה 3 - Python Script](screenshots/WhatsApp%20Image%202026-04-15%20at%2014.51.15.jpeg)
 
 **בונוס — INSERT ידני ב-pgAdmin:**
 
-![INSERT ידני](screemshots/WhatsApp%20Image%202026-04-15%20at%2014.47.17.jpeg)
+![INSERT ידני](screenshots/WhatsApp%20Image%202026-04-15%20at%2014.47.17.jpeg)
 
 ---
 
@@ -154,14 +154,14 @@
 
 > הקובץ נשמר בשם: `15.04.2026`
 
-![גיבוי נתונים](screemshots/WhatsApp%20Image%202026-04-15%20at%2014.44.14.jpeg)
+![גיבוי נתונים](screenshots/WhatsApp%20Image%202026-04-15%20at%2014.44.14.jpeg)
 
 ---
 
 ### שחזור נתונים (Restore)
 שחזור בסיס הנתונים בוצע דרך pgAdmin על ידי בחירת קובץ הגיבוי ולחיצה על Restore.
 
-![שחזור נתונים](screemshots/%D7%A6%D7%99%D7%9C%D7%95%D7%9D%20%D7%9E%D7%A1%D7%9A%202026-04-15%20143946.png)
+![שחזור נתונים](screenshots/%D7%A6%D7%99%D7%9C%D7%95%D7%9D%20%D7%9E%D7%A1%D7%9A%202026-04-15%20143946.png)
 
 ---
 
