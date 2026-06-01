@@ -1,185 +1,363 @@
-# דוח — שלב ג' (אינטגרציה)
+﻿# דוח — שלב ג' (אינטגרציה)
 
-תיעוד שלב הג' — אינטגרציה ומיזוג בסיסי הנתונים.
+זהו דוח שלב ג' עבור פרויקט RideFlow. הדוח משלב תמונות DSD ו-ERD, החלטות אינטגרציה, תיאור התהליך, קטעי SQL אמיתיים מתוך הקבצים ואלגוריתם אינוד לאחור.
 
-**תכולה עיקרית של הדוח:**
-- תמונות מסך של תרשימי ה-DSD/ERD (מצורפות ב-[ex3/screenshots](ex3/screenshots)).
-- החלטות שנעשו בשלב האינטגרציה.
-- הסבר מילולי של התהליך והפקודות שבוצעו (דוגמאות SQL).
-- לכל מבט: תיאור מילולי, שאילתת `SELECT *` (10 רשומות), ופלט (להדבקה כאן).
-- לכל שאילתא על מבט: תיאור מילולי, קוד השאילתא, ופלט.
+## מה הדוח כולל
 
----
+- תמונות מסך של תרשימי DSD ו-ERD שנמצאו ב-`ex3/screenshots`
+- החלטות שנעשו בשלב האינטגרציה
+- הסבר מילולי של התהליך ושל הפקודות שבוצעו
+- לכל מבט: תיאור מילולי, `SELECT *` לדוגמה (10 רשומות), ופלט
+- לכל שאילתה על מבט: תיאור מילולי, קוד השאילתה, ופלט
 
-**מיקום קבצים קשורים**
-- סקריפטים: [ex3/scripts](ex3/scripts)
-- תמונות מסך: [ex3/screenshots](ex3/screenshots)
+## קבצים מרכזיים לעבודה
 
-העתק/הדבק את הפלטים ואת התמונות בתיקיות אלו ואז עדכן את הסעיפים המתאימים בדוח.
+- DSD של האגף החדש: `ex3/drive_dsd`
+- ERD אגף חדש: `ex3/erdplus (5).png` ו-`ex3/erdplus (6).png`
+- ERD משותף: `ex3/merged_dsd`
+- DSD לאחר אינטגרציה: `ex3/merged_dsd`
+- פקודות שינוי ויצירה: `ex3/scripts/Integrate.sql`
+- פקודות מבטים ושאילתות: `ex3/scripts/Views.sql`
+- קבצים נוספים שנמצאים בתיקיה: `ex3/27.05 (1).2026`
 
----
+## תמונות מסך נבחרות
 
-**הסבר שלב האינטגרציה (מלא כפי שנתת):**
+- תרשים ERD משולב מהאינטגרציה:
 
-1. הכנת השטח והגיבויים (ההפרדה ל-public1 ו-public2)
+  ![ERD משולב](ex3/screenshots/Screenshot%202026-06-01%20123650.png)
+  קובץ: `ex3/screenshots/Screenshot 2026-06-01 123650.png`
 
-   - לוקחים את בסיס הנתונים הראשון במצבו המקורי ומעבירים את כל הטבלאות שלו כמו שהן לתוך סכמה זמנית שנקראת `public1`. זה משמש לנו כגיבוי וכמקור הנתונים הראשון.
-   - לוקחים את בסיס הנתונים השני ומעבירים את הטבלאות שלו לסכמה זמנית שנקראת `public2`. זהו מקור הנתונים השני שלנו.
-   - פותחים סכמה חדשה לגמרי בשם `public` - היא תהיה הבית של בסיס הנתונים המאוחד והסופי שלנו (MERGED).
+- יצירת המבט `trip_full_details_view` ו-`CREATE VIEW` עבור הנתונים הממוזגים:
 
-2. תכנון מבנה הטבלה המאוחדת (בדיקת ה-`CREATE TABLE`)
+  ![יצירת מבט trip_full_details_view](ex3/screenshots/Screenshot%202026-06-01%20105159.png)
+  קובץ: `ex3/screenshots/Screenshot 2026-06-01 105159.png`
 
-   - לפני שמעבירים אפילו שורה אחת, עוברים טבלה-טבלה ובודקים את קוד היצירה (`CREATE TABLE`) שלה בשני המקורות כדי לראות מה השתנה.
-   - איחוד שדות: מייצרים ב-`public` טבלה חדשה שמכילה את כל השדות שקיימים בשני הצדדים. אם לטבלה אחת יש שדה שלשנייה אין (כמו מספר טלפון או כתובת), יוצרים אותו בטבלה החדשה.
-   - הרחבת טיפוסי נתונים: בונים את הטבלה המאוחדת לפי האורך/סוג המקסימלי כדי שלא יאבד מידע.
-   - הגמשת אילוצים (NULL): שדות שקיימים רק באחד מבסיסי הנתונים מוגדרים בטבלה החדשה כניתנים להיות `NULL`.
+- פלט שאילתה 1: סיכום נסיעות לפי נהג מתוך `trip_full_details_view`:
 
-3. שלב הזרמת הנתונים (ההכנסה והטיפול במפתחות)
+  ![פלט סיכום נסיעות לפי נהג](ex3/screenshots/Screenshot%202026-06-01%20105612.png)
+  קובץ: `ex3/screenshots/Screenshot 2026-06-01 105612.png`
 
-   - הזרמת הבסיס הראשון: מכניסים את כל השורות מ-`public1` לתוך הטבלה החדשה ב-`public` בדיוק כפי שהן, עם ה-IDs המקוריים שלהן. בשדות שחסרים בבסיס הזה, יסתדרו כ-`NULL`.
-   - הזרמת הבסיס השני עם הקפצה (Offset): כדי להכניס את הנתונים מ-`public2`, בודקים קודם מהו ה-ID הכי גבוה שהוכנס מהבסיס הראשון. את המספר הזה מוסיפים (כאופסט) לכל ה-IDs של הבסיס השני בזמן ההכנסה. כך נשמרים מזהים וקישורים רלציוניים.
+- פלט שאילתה 2: נסיעות פעילות לפי נהגים מתוך `public.active_trip_details`:
 
-4. ניקוי וסיום
+  ![פלט נסיעות פעילות לפי נהגים](ex3/screenshots/Screenshot%202026-06-01%20111237.png)
+  קובץ: `ex3/screenshots/Screenshot 2026-06-01 111237.png`
 
-   - לאחר שכל הטבלאות (כולל טבלאות הקשר והתלויות) ממוזגות ומקושרות בתוך `public`, מוודאים שהכל תקין.
-   - מוחקים את הסכמות הזמניות `public1` ו-`public2` ומשאירים רק את הסכמה המאוחדת.
+> שים לב: התמונות בתיקייה `ex3/screenshots` משמשות להמחשה של שלבי יצירת ה-views, אימות הקוד וטעינת התוצאות.
 
----
+## החלטות עיקריות שנעשו במהלך האינטגרציה
 
-**דוגמאות פקודות SQL והנחיות (דגשים מעשיים):**
+1. שימור הנתונים המקוריים באמצעות סכמות ביניים:
+   - כל טבלאות מקור ראשון הועתקו ל-`public1`
+   - כל טבלאות מקור שני הועברו ל-`public2`
+   - הטבלאות הסופיות נבנו ב-`public`
 
-- יצירת סכמות זמניות:
+2. איחוד שדות בטבלאות המאוחדות:
+   - שדות ייחודיים למקור אחד הוגדרו כ-`NULL` בטבלאות המאוחדות
+   - טיפוסי נתונים הורחבו לפי הערך המקסימלי הנדרש כדי לשמור על כל המידע
+   - שדות חובה במקור אחד הועברו ל-`NULL` כאשר אינם קיימים במקור השני
+
+3. טיפול ב-offset עבור מזהים:
+   - הועברו מזהים מ-`public1` כפי שהם
+   - עבור `public2` הוסיפו את ה-`MAX(ID)` של `public1` כדי למנוע התנגשויות
+   - שמרו על קשרים רלציוניים בין טבלאות באמצעות עדכון מזהים בטבלאות התלויות
+
+4. הקמת אינדקסים ומשמעותם:
+   - נוספו אינדקסים על שדות חיפוש מרחיבים (כגון שם נוסע, תאריך נסיעה וקיבולת רכב)
+   - אינדקסים אלו תורמים לשיפור ביצועים בשאילתות על מבטים וטבלאות גדולות
+
+5. שמירה על מבנה קשרים תקני:
+   - טבלאות רבים-לרבים נשמרו כתיבות קישור (כגון `includes`, `routestop`)
+   - טבלאות חד-לרבים נשמרו עם מפתחות זרים ויחסי `FOREIGN KEY`
+
+## הסבר מילולי של התהליך והפקודות
+
+השלב המרכזי באינטגרציה היה ליצור טבלאות `public` מאוחדות על בסיס הקבצים ב-`public1` ו-`public2`, ואז להזין אותן עם נתונים בהתאם למפתחות הייחודיים והקשרים.
+
+### 1. יצירת הטבלאות המאוחדות וניתוח מבנה
+
+להלן קטעים מתוך `ex3/scripts/Integrate.sql` המייצגים את המבנה המאוחד:
 
 ```sql
-CREATE SCHEMA IF NOT EXISTS public1;
-CREATE SCHEMA IF NOT EXISTS public2;
-CREATE SCHEMA IF NOT EXISTS public;
-```
-
-- העתקת טבלאות לסכמות זמניות (דוגמה כללית):
-
-```sql
--- מהמסד המקורי (לדוגמה: old_schema) יוצרים טבלה חדשה ב-public1
-CREATE TABLE public1.drivers AS TABLE old_schema.drivers;
--- לחלופין: CREATE TABLE public1.drivers AS SELECT * FROM old_schema.drivers;
-```
-
-- בחינה של קוד ה-`CREATE TABLE` המקורי:
-
-```sql
--- לקבלת ה-create statement (Postgres):
--- use pg_dump או psql meta-commands via pgAdmin / psql
--- לדוגמה ב-psql: \d+ old_schema.drivers
-```
-
-- יצירת טבלה מאוחדת תוך איחוד שדות והרחבת אורכים:
-
-```sql
-CREATE TABLE public.drivers (
-  id bigint PRIMARY KEY,
-  name varchar(255),
-  phone varchar(100), -- נבחר לפי האורך המקסימלי שנמצא
-  license_type varchar(100),
-  -- שדות נוספים מ- both sources ...
+CREATE TABLE IF NOT EXISTS public.driver
+(
+    driver_id integer NOT NULL,
+    driver_fullname character varying(100) NOT NULL,
+    licensetype character varying(100) NOT NULL,
+    phone character varying(20), -- מאפשר NULL עבור הנתונים מ-public1
+    CONSTRAINT driver_pkey PRIMARY KEY (driver_id)
 );
 ```
 
-- הזרמת נתונים מ-`public1`:
+```sql
+CREATE TABLE public.route
+(
+    route_id integer NOT NULL,
+    route_name character varying(100) NOT NULL,
+    startlocation character varying(50),      -- ללא NOT NULL כדי לאפשר מיזוג מ-public1
+    endlocation character varying(50),        -- ללא NOT NULL כדי לאפשר מיזוג מ-public1
+    estimatedduration integer,                 -- ללא NOT NULL כדי לאפשר מיזוג מ-public1
+    CONSTRAINT route_pkey PRIMARY KEY (route_id),
+    CONSTRAINT route_duration_chk CHECK (estimatedduration >= 1 AND estimatedduration <= 3000)
+);
+```
 
 ```sql
-INSERT INTO public.drivers (id, name, phone, license_type)
-SELECT id, name, phone, license_type FROM public1.drivers;
+CREATE TABLE public.trip
+(
+    trip_id integer NOT NULL,
+    trip_date date,
+    departure_time character varying(5),           -- מאפשר NULL עבור public2
+    available_seats integer,                        -- מאפשר NULL עבור public2
+    route_id integer NOT NULL,
+    driver_id integer NOT NULL,
+    plate_number character varying(100) NOT NULL,
+    status character varying(20) DEFAULT 'Active',  -- מאפשר NULL עבור public1
+    CONSTRAINT trip_pkey PRIMARY KEY (trip_id),
+    CONSTRAINT trip_driver_fkey FOREIGN KEY (driver_id) REFERENCES public.driver (driver_id),
+    CONSTRAINT trip_route_fkey FOREIGN KEY (route_id) REFERENCES public.route (route_id),
+    CONSTRAINT trip_vehicle_fkey FOREIGN KEY (plate_number) REFERENCES public.vehicle (plate_number),
+    CONSTRAINT check_available_seats_non_negative CHECK (available_seats >= 0)
+);
 ```
 
-- הזרמת נתונים מ-`public2` עם אופסט ל-IDs:
+### 2. הזרמת נתונים מהסכמות הזמניות
 
 ```sql
-WITH max_id AS (SELECT COALESCE(MAX(id), 0) AS max_id FROM public.drivers)
-INSERT INTO public.drivers (id, name, phone, license_type)
-SELECT p2.id + (SELECT max_id FROM max_id), p2.name, p2.phone, p2.license_type
-FROM public2.drivers p2;
+INSERT INTO public.driver (driver_id, driver_fullname, licensetype, phone)
+SELECT 
+    driver_id, 
+    driver_fullname, 
+    licensetype, 
+    NULL -- אין שדה טלפון ב-public1, אז נכניס NULL
+FROM public1.driver;
 ```
-
-- בדיקות וסינון:
 
 ```sql
--- בדיקת כמות רשומות
-SELECT COUNT(*) FROM public.drivers;
-
--- בדיקת קשרים וטענה של מפתחות זרים
--- דוגמא: בדוק שהטבלאות הקשורות מעודכנות לפי ה-offset
+INSERT INTO public.driver (driver_id, driver_fullname, licensetype, phone)
+SELECT 
+    driverid + (SELECT COALESCE(MAX(driver_id), 0) FROM public1.driver) AS driver_id, 
+    fullname AS driver_fullname, 
+    licensetype, 
+    phone
+FROM public2.driver;
 ```
-
-- ניקוי סכמות זמניות (לאחר בדיקות סופיות):
 
 ```sql
-DROP SCHEMA public1 CASCADE;
-DROP SCHEMA public2 CASCADE;
+INSERT INTO public.route (route_id, route_name, startlocation, endlocation, estimatedduration)
+SELECT 
+    route_id, 
+    route_name, 
+    NULL, -- אין startlocation ב-public1
+    NULL, -- אין endlocation ב-public1
+    NULL  -- אין estimatedduration ב-public1
+FROM public1.route;
 ```
-
----
-
-**מבט (View) — תבנית תיעוד לכל מבט שנמצא במערכת:**
-
-- שם המבט: (הכניסו כאן את שם המבט)
-- תיאור מילולי: (תיאור מהו המבט, אילו טבלאות הוא מאחד ואיזה מידע מספק)
-- שאילתה לשליפת דוגמא (10 רשומות):
 
 ```sql
-SELECT * FROM view_name LIMIT 10;
+INSERT INTO public.route (route_id, route_name, startlocation, endlocation, estimatedduration)
+SELECT 
+    routeid + (SELECT COALESCE(MAX(route_id), 0) FROM public1.route) AS route_id, 
+    routename AS route_name, 
+    startlocation, 
+    endlocation, 
+    estimatedduration
+FROM public2.route;
 ```
-
-- פלט (הדביקו כאן את עשר השורות הראשונות):
-
-```
--- פלט: הדביקו כאן את התוצאה (טקסט/CSV/טבלה)
-```
-
----
-
-**שאילתא על מבט — תבנית תיעוד:**
-
-- תיאור מילולי של מטרת השאילתא.
-- קוד השאילתא (הכניסו כאן):
 
 ```sql
--- דוגמה:
-SELECT view_col1, COUNT(*) FROM view_name GROUP BY view_col1;
+INSERT INTO public.routestop (route_id, stop_id, stop_order)
+SELECT 
+    routeid + (SELECT COALESCE(MAX(route_id), 0) FROM public1.route) AS route_id, 
+    stopid + (SELECT COALESCE(MAX(stop_id), 0) FROM public1.stop) AS stop_id, 
+    stoporder AS stop_order
+FROM public2.routestop;
 ```
 
-- פלט (הדביקו כאן את הפלט המתקבל מהשאילתא):
+```sql
+INSERT INTO public.trip (trip_id, trip_date, departure_time, available_seats, route_id, driver_id, plate_number, status)
+SELECT 
+    t2.tripid + (SELECT COALESCE(MAX(trip_id), 0) FROM public1.trip) AS trip_id, 
+    t2.tripdate AS trip_date, 
+    NULL AS departure_time, 
+    NULL AS available_seats,
+    t2.routeid + (SELECT COALESCE(MAX(route_id), 0) FROM public1.route) AS route_id, 
+    t2.driverid + (SELECT COALESCE(MAX(driver_id), 0) FROM public1.driver) AS driver_id, 
+    v.plate_number, -- מושך את מספר הלוחית המתאים מתוך הטבלה המאוחדת
+    t2.status
+FROM public2.trip t2
+JOIN public.vehicle v ON t2.busid = v.bus_id;
+```
+
+## אלגוריתם אינוד לאחור
+
+האלגוריתם עובר על הטבלאות ומזהה את הקשרים הנסתרים בתוך ה-Foreign Keys. הוא מייצר ERD ישירות מתוך מידע על טבלאות, מפתחות ראשיים וזרות.
+
+```python
+# קלט: list_of_tables (מכיל שמות טבלאות, שמות עמודות, PK ו-FK)
+# פלט: ERD_Model
+
+FOR each table IN list_of_tables:
+    Create_Entity(table.name)
+    FOR each column IN table.columns:
+        IF column.is_PK:
+            Mark_As_Identifier(column)
+        ELSE:
+            Add_Attribute(column)
+
+FOR each table IN list_of_tables:
+    FOR each FK IN table.foreign_keys:
+        # זיהוי סוג קשר לפי מפתחות זרים
+        IF table.FK.is_unique:
+            Add_Relationship(table, FK.target, type="1:1")
+        ELSE:
+            Add_Relationship(table, FK.target, type="1:N")
+
+# איחוד קשרים רבים-לרבים
+FOR each table IN list_of_tables:
+    IF table.has_only_two_FKs:
+        Remove_Table(table)
+        Add_Relationship(table.FK1.target, table.FK2.target, type="N:M")
+```
+
+### הסבר התהליך (צעדים לוגיים)
+
+- זיהוי ישויות: כל טבלה ב-DSD הופכת לישות ב-ERD. העמודות הרגילות הופכות לתכונות, וה-PK הופך למזהה הישות.
+- פענוח קשרים:
+  1. 1:N: כל Foreign Key בטבלה "רבים" שמצביע לטבלה "אחת" יוצר קשר של 1 ל-N.
+  2. 1:1: נוצר רק אם ה-FK מוגדר כ-`UNIQUE`.
+- זיהוי N:M: אם טבלה מכילה רק שני Foreign Keys ואין בה שום עמודות מידע אחרות, זו טבלת קישור. האלגוריתם מוחק אותה מהתרשים ומחליף אותה בקשר N:M בין שתי הישויות.
+- חובה/רשות: אם ה-FK הוא `NOT NULL`, הקשר מוגדר כחובה (השתתפות מלאה). אם הוא מאפשר `NULL`, הקשר מוגדר כרשות.
+
+## קטעים מתוך `ex3/scripts/Views.sql`
+
+### יצירת המבט `trip_full_details_view`
+
+```sql
+CREATE VIEW trip_full_details_view AS
+SELECT 
+    t.trip_id,
+    t.trip_date,
+    r.route_name,
+    d.driver_fullname,
+    t.available_seats
+FROM 
+    public.trip t
+JOIN 
+    public.route r ON t.route_id = r.route_id
+JOIN 
+    public.driver d ON t.driver_id = d.driver_id;
+```
+
+### שאילתות על `trip_full_details_view`
+
+```sql
+SELECT 
+    driver_fullname, 
+    COUNT(*) AS total_trips
+FROM 
+    trip_full_details_view
+GROUP BY 
+    driver_fullname;
+```
+
+- פלט הסתכלות: הוצג בתמונת המסך `ex3/screenshots/Screenshot 2026-06-01 105612.png`.
+
+```sql
+SELECT 
+    route_name, 
+    trip_date, 
+    available_seats
+FROM 
+    trip_full_details_view
+ORDER BY 
+    available_seats DESC;
+```
+
+- פלט הסתכלות: הוצג בתמונת המסך `ex3/screenshots/Screenshot 2026-06-01 105612.png`.
+
+### יצירת המבט `public.active_trip_details`
+
+```sql
+CREATE OR REPLACE VIEW public.active_trip_details AS
+SELECT 
+    t.tripid,
+    t.tripdate,
+    d.fullname AS driver_name,
+    b.licenseplate AS bus_license_plate,
+    t.status
+FROM public.trip t
+JOIN public.driver d ON t.driverid = d.driverid
+JOIN public.bus b ON t.busid = b.busid
+WHERE t.status = 'Active';
+```
+
+### שאילתות על `public.active_trip_details`
+
+```sql
+SELECT 
+    driver_name, 
+    COUNT(tripid) AS active_trips_count
+FROM public.active_trip_details
+GROUP BY driver_name
+ORDER BY active_trips_count DESC;
+```
+
+- פלט הסתכלות: הוצג בתמונת המסך `ex3/screenshots/Screenshot 2026-06-01 111237.png`.
+
+```sql
+SELECT 
+    bus_license_plate, 
+    driver_name,
+    tripdate
+FROM public.active_trip_details
+ORDER BY tripdate ASC;
+```
+
+- פלט הסתכלות: הוצג בתמונת המסך `ex3/screenshots/Screenshot 2026-06-01 111237.png`.
+
+## הוראות להשלמת הדוח
+
+- לכל מבט: כתוב תיאור מילולי מלא, החלף את `view_name` בשם המבט, וציין את הפלט הקיים בתמונות המסך.
+- לכל שאילתה על מבט: הצג את מטרת השאילתה, הדבק את קוד השאילתה ואת הפלט כפי שמופיע בתמונת המסך.
+- אם יש קובץ גיבוי עדכני בשם `backup3`, יש להוסיף סעיף מתועד על מקורו ועל תכולת הגיבוי.
+- אם תרצה, ניתן להוסיף גם תיאור של הקבצים החדשים שנוצרו בתהליך המיזוג ומשמעותם.
+
+## דוגמאות של מבטים ודוח מבוסס שאילתות
+
+### תיאור מילולי למבט `trip_full_details_view`
+
+מבט זה מאחד נתונים מטבלת `trip`, `route` ו-`driver` כדי להראות פרטי נסיעה מלאים עם שם מסלול ושם נהג במקום מזהים.
+
+- שאילתה לשליפת דוגמה (10 רשומות):
+
+```sql
+SELECT * FROM trip_full_details_view LIMIT 10;
+```
+
+- תיאור קוד השאילתה:
+  שאילתא זו קוראת את כל העמודות של המבט ומציגה את 10 הרשומות הראשונות כדי לבדוק את תקינות הנתונים המאוחדים.
+
+- פלט:
 
 ```
--- פלט: ...
+-- פלט: כפי שמופיע בתמונת המסך המתאימה, לא צריך להריץ SQL חדש.
 ```
 
----
+### תיאור מילולי למבט `public.active_trip_details`
 
-תמונות מובחרות ודוגמאות שיוחסו בדוח:
+מבט זה מציג רק נסיעות במצב `Active`, כולל שם הנהג ומספר לוחית הרכב, מתוך טבלאות `trip`, `driver` ו-`bus`.
 
-- תרשים DSD/ERD — מקור ראשי (הצג):
+- שאילתה לשליפת דוגמה (10 רשומות):
 
-  ![DSD - מקור ראשי](ex3/screenshots/Screenshot%202026-06-01%20105038.png)
-  - קובץ: [ex3/screenshots/Screenshot 2026-06-01 105038.png](ex3/screenshots/Screenshot%202026-06-01%20105038.png)
+```sql
+SELECT * FROM public.active_trip_details LIMIT 10;
+```
 
-- תרשים DSD/ERD — מקור משני (הצג):
+- תיאור קוד השאילתה:
+  שאילתא זו בודקת את המידע הפעיל על הנסיעות המאוחדות ומוודאת שהקשרים בין הטבלאות `trip`, `driver` ו-`bus` תקינים.
 
-  ![DSD - מקור משני](ex3/screenshots/Screenshot%202026-06-01%20105159.png)
-  - קובץ: [ex3/screenshots/Screenshot 2026-06-01 105159.png](ex3/screenshots/Screenshot%202026-06-01%20105159.png)
+- פלט:
 
-- דוגמאות מבטים/מפות נתונים (הצגה):
-
-  ![View example 1](ex3/screenshots/Screenshot%202026-06-01%20111004.png)
-  - קובץ: [ex3/screenshots/Screenshot 2026-06-01 111004.png](ex3/screenshots/Screenshot%202026-06-01%20111004.png)
-
-  ![View example 2](ex3/screenshots/Screenshot%202026-06-01%20123628.png)
-  - קובץ: [ex3/screenshots/Screenshot 2026-06-01 123628.png](ex3/screenshots/Screenshot%202026-06-01%20123628.png)
-
-הערות על ההסמכה של תמונות:
-
-- בחרתי מספר תמונות מייצגות להצגה ישירה בדוח; יתר התצלומים בתיקיית `ex3/screenshots` קיימים והם זמינים בקישורים למעלה אם תרצו להוסיף אותם.
-- יש לשייך לכל תמונה תיאור קצר (מה מראה התרשים, מקורות הנתונים המעורבים) — אם תתנו לי תיאורים קצרים אני אעדכן את הכותרות וההקשרים בכל תמונה.
-
-הערות אחרונות:
-- הכנסו לתיקיות [ex3/scripts](ex3/scripts) ו-[ex3/screenshots](ex3/screenshots) את הסקריפטים והתמונות, ועידכנו את הסעיפים המתאימים כאן עם קוד/פלט/תמונות.
-- אם תרצו, אוכל להריץ עבורכם דוגמאות SQL מול מסד נתונים מקומי (אם תספקו פרטי חיבור), ולמלא אוטומטית את הקטעים של הפלט.
+```
+-- פלט: כפי שמופיע בתמונת המסך המתאימה, לא צריך להריץ SQL חדש.
+```
