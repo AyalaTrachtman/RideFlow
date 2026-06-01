@@ -155,6 +155,31 @@ SELECT view_col1, COUNT(*) FROM view_name GROUP BY view_col1;
 
 ---
 
+תמונות מובחרות ודוגמאות שיוחסו בדוח:
+
+- תרשים DSD/ERD — מקור ראשי (הצג):
+
+  ![DSD - מקור ראשי](ex3/screenshots/Screenshot%202026-06-01%20105038.png)
+  - קובץ: [ex3/screenshots/Screenshot 2026-06-01 105038.png](ex3/screenshots/Screenshot%202026-06-01%20105038.png)
+
+- תרשים DSD/ERD — מקור משני (הצג):
+
+  ![DSD - מקור משני](ex3/screenshots/Screenshot%202026-06-01%20105159.png)
+  - קובץ: [ex3/screenshots/Screenshot 2026-06-01 105159.png](ex3/screenshots/Screenshot%202026-06-01%20105159.png)
+
+- דוגמאות מבטים/מפות נתונים (הצגה):
+
+  ![View example 1](ex3/screenshots/Screenshot%202026-06-01%20111004.png)
+  - קובץ: [ex3/screenshots/Screenshot 2026-06-01 111004.png](ex3/screenshots/Screenshot%202026-06-01%20111004.png)
+
+  ![View example 2](ex3/screenshots/Screenshot%202026-06-01%20123628.png)
+  - קובץ: [ex3/screenshots/Screenshot 2026-06-01 123628.png](ex3/screenshots/Screenshot%202026-06-01%20123628.png)
+
+הערות על ההסמכה של תמונות:
+
+- בחרתי מספר תמונות מייצגות להצגה ישירה בדוח; יתר התצלומים בתיקיית `ex3/screenshots` קיימים והם זמינים בקישורים למעלה אם תרצו להוסיף אותם.
+- יש לשייך לכל תמונה תיאור קצר (מה מראה התרשים, מקורות הנתונים המעורבים) — אם תתנו לי תיאורים קצרים אני אעדכן את הכותרות וההקשרים בכל תמונה.
+
 הערות אחרונות:
 - הכנסו לתיקיות [ex3/scripts](ex3/scripts) ו-[ex3/screenshots](ex3/screenshots) את הסקריפטים והתמונות, ועידכנו את הסעיפים המתאימים כאן עם קוד/פלט/תמונות.
 - אם תרצו, אוכל להריץ עבורכם דוגמאות SQL מול מסד נתונים מקומי (אם תספקו פרטי חיבור), ולמלא אוטומטית את הקטעים של הפלט.
