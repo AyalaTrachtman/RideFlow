@@ -343,17 +343,10 @@ ORDER BY
 
 #### תמונות מסך של השאילתות
 
-**יצירת המבט:**
-![CREATE VIEW trip_full_details_view](screenshots/Screenshot 2026-06-01 105159.png)
-
-**SELECT * מהמבט (10 רשומות ראשונות):**
-![SELECT * FROM trip_full_details_view](screenshots/Screenshot 2026-06-01 113005.png)
-
-**שאילתה 1 - סיכום נסיעות לפי נהג:**
-![COUNT trips per driver](screenshots/Screenshot 2026-06-01 105612.png)
-
-**שאילתה 2 - נסיעות עם הכי הרבה מקומות פנויים:**
-![Trips with most available seats](screenshots/Screenshot 2026-06-01 105950.png)
+![CREATE VIEW trip_full_details_view](screenshots/Screenshot%202026-06-01%20105159.png)
+![SELECT * FROM trip_full_details_view](screenshots/Screenshot%202026-06-01%20113005.png)
+![COUNT trips per driver](screenshots/Screenshot%202026-06-01%20105612.png)
+![Trips with most available seats](screenshots/Screenshot%202026-06-01%20105950.png)
 
 ---
 
@@ -410,14 +403,9 @@ ORDER BY tripdate ASC;
 
 #### תמונות מסך של השאילתות
 
-**יצירת המבט:**
-![CREATE VIEW active_trip_details](screenshots/Screenshot 2026-06-01 111004.png)
-
-**שאילתה 1 - ספירת נסיעות פעילות לכל נהג:**
-![COUNT active trips per driver](screenshots/Screenshot 2026-06-01 111237.png)
-
-**שאילתה 2 - רשימת אוטובוסים פעילים ונהגיהם:**
-![Active buses and their drivers](screenshots/Screenshot 2026-06-01 111254.png)
+![CREATE VIEW active_trip_details](screenshots/Screenshot%202026-06-01%20111004.png)
+![COUNT active trips per driver](screenshots/Screenshot%202026-06-01%20111237.png)
+![Active buses and their drivers](screenshots/Screenshot%202026-06-01%20111254.png)
 
 ---
 
