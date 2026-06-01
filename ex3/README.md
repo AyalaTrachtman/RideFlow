@@ -341,13 +341,19 @@ ORDER BY
     available_seats DESC;
 ```
 
-#### תמונת מסך רלוונטית
+#### תמונות מסך של השאילתות
 
-![שאילתות trip_full_details_view - פסיקה](screenshots/Screenshot 2026-06-01 105159.png)
+**יצירת המבט:**
+![CREATE VIEW trip_full_details_view](screenshots/Screenshot 2026-06-01 105159.png)
 
-![פלט trip_full_details_view](screenshots/Screenshot 2026-06-01 105612.png)
+**SELECT * מהמבט (10 רשומות ראשונות):**
+![SELECT * FROM trip_full_details_view](screenshots/Screenshot 2026-06-01 113005.png)
 
-> בתמונות אלה מופיעה גם יצירת המבט `trip_full_details_view` וגם פלט השאילתות על המבט.
+**שאילתה 1 - סיכום נסיעות לפי נהג:**
+![COUNT trips per driver](screenshots/Screenshot 2026-06-01 105612.png)
+
+**שאילתה 2 - נסיעות עם הכי הרבה מקומות פנויים:**
+![Trips with most available seats](screenshots/Screenshot 2026-06-01 105950.png)
 
 ---
 
@@ -402,13 +408,16 @@ FROM public.active_trip_details
 ORDER BY tripdate ASC;
 ```
 
-#### תמונת מסך רלוונטית
+#### תמונות מסך של השאילתות
 
-![יצירת מבט active_trip_details](screenshots/Screenshot 2026-06-01 111004.png)
+**יצירת המבט:**
+![CREATE VIEW active_trip_details](screenshots/Screenshot 2026-06-01 111004.png)
 
-![פלט active_trip_details](screenshots/Screenshot 2026-06-01 111237.png)
+**שאילתה 1 - ספירת נסיעות פעילות לכל נהג:**
+![COUNT active trips per driver](screenshots/Screenshot 2026-06-01 111237.png)
 
-> בתמונות אלה מופיעה גם יצירת המבט `public.active_trip_details` וגם פלט השאילתות על המבט.
+**שאילתה 2 - רשימת אוטובוסים פעילים ונהגיהם:**
+![Active buses and their drivers](screenshots/Screenshot 2026-06-01 111254.png)
 
 ---
 
