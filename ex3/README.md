@@ -24,23 +24,31 @@
 
 ## תמונות מסך של תרשימי DSD ו-ERD
 
-### DSD/ERD של האגף החדש
+### DSD של האגף החדש (Source)
 
-![ERD אגף חדש](screenshots/erdplus (5).png)
+![DSD - drive_dsd](screenshots/Screenshot%202026-06-01%20123628.png)
 
-### ERD משותף
+### ERD של האגף החדש
 
-![ERD משותף](screenshots/erdplus (6).png)
+![ERD אגף חדש](screenshots/erdplus%20%285%29.png)
 
-### תרשים ERD של מסד הנתונים המאוחד
+### DSD לאחר אינטגרציה (Merged)
 
-![ERD מאוחד](screenshots/Screenshot 2026-06-01 123650.png)
+![DSD מאוחד - merged_dsd](screenshots/Screenshot%202026-06-01%20123729.png)
+
+### ERD משותף (בין שני המקורות)
+
+![ERD משותף](screenshots/erdplus%20%286%29.png)
+
+### תרשים ERD של מסד הנתונים המאוחד (Final)
+
+![ERD מאוחד](screenshots/Screenshot%202026-06-01%20123650.png)
 
 ### תרשים מקור ראשי לפני אינטגרציה
 
-![DSD/ERD מקור ראשי](screenshots/Screenshot 2026-06-01 105038.png)
+![DSD/ERD מקור ראשי](screenshots/Screenshot%202026-06-01%20105038.png)
 
-> התמונות לעיל מציגות את המבנים הלוגיים, הקשרים בין הישויות והמעבר ממבנים נפרדים למבנה מאוחד.
+> התמונות לעיל מציגות את המבנים הלוגיים, הקשרים בין הישויות, התהליך של מיזוג שתי סכמות, והמעבר ממבנים נפרדים למבנה מאוחד.
 
 ---
 
@@ -85,6 +93,10 @@
 ---
 
 ## קטעי קוד מהאינטגרציה (`scripts/Integrate.sql`)
+
+### תמונת הקוד בתהליך ההרצה
+
+![Integrate.sql execution](screenshots/Screenshot%202026-06-01%20105746.png)
 
 ### יצירת הטבלאות והגדרת שדות
 
