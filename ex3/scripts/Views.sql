@@ -1,82 +1,70 @@
-/* This view consolidates data from the trip, route, and driver
-tables into a single readable format. It replaces IDs with actual names, 
-allowing you to fetch complete trip details via one simple query.*/
 
-CREATE VIEW trip_full_details_view AS
+-- Create a view to combine trip status with vehicle specifications
+CREATE VIEW view_trip_details AS
 SELECT 
-    t.trip_id,           -- The unique identifier of the trip
-    t.trip_date,         -- The date of the trip
-    r.route_name,        -- The name of the route (from route table)
-    d.driver_fullname,   -- The name of the driver (from driver table)
-    t.available_seats    -- Number of available seats
-FROM 
-    public.trip t
-JOIN 
-    public.route r ON t.route_id = r.route_id
-JOIN 
-    public.driver d ON t.driver_id = d.driver_id; -- Assuming driver_id exists in trip
+    t.trip_id,
+    t.trip_date,
+    t.departure_time,
+    t.route_id,
+    t.status,
+    t.available_seats,
+    v.plate_number,
+    v.model AS vehicle_model,
+    v.manufacturer AS vehicle_manufacturer,
+    v.capacity AS max_capacity
+FROM trip t
+-- Join trips with vehicles using the plate_number column
+JOIN vehicle v ON t.plate_number = v.plate_number
+-- Filter to show only active trips
+WHERE t.status = 'Active';
 
---query 1 
--- This query calculates the total number of trips assigned to each driver.
+select * from view_trip_details
+
+-- Retrieve all active trips from a specific baseline date that still have available seats
+SELECT trip_id, route_id, trip_date, departure_time, available_seats, vehicle_model
+FROM view_trip_details
+WHERE trip_date >= '2026-05-01'
+  --AND available_seats > 0
+ORDER BY trip_date ASC, departure_time ASC;
+
+
+
+-- Analyze trip counts and average availability grouped by vehicle model
+SELECT vehicle_model, COUNT(trip_id) AS total_trips, AVG(available_seats) AS avg_seats
+FROM view_trip_details
+GROUP BY vehicle_model;
+
+
+
+-----------------------------------------------------------------------------------------------------------
+
+-- Create a view to track driver assignments and calculate total workload
+CREATE VIEW view_driver_workload AS
 SELECT 
-    driver_fullname, 
-    COUNT(*) AS total_trips -- Counting the total trips for every driver
-FROM 
-    trip_full_details_view
-GROUP BY 
-    driver_fullname;
+    d.driver_id,
+    d.driver_fullname,
+    d.licensetype,
+    d.phone,
+    -- Count total trips assigned to each driver
+    COUNT(t.trip_id) AS total_assigned_trips
+FROM driver d
+-- Use LEFT JOIN so drivers with no trips yet will still appear in the list
+LEFT JOIN trip t ON d.driver_id = t.driver_id
+GROUP BY d.driver_id, d.driver_fullname, d.licensetype, d.phone;
 
-select * from trip_full_details_view
+select * from view_driver_workload
 
---query 2
---This query lists the trips with the most available seats, helping to identify which routes have the most capacity.
-SELECT 
-    route_name, 
-    trip_date, 
-    available_seats
-FROM 
-    trip_full_details_view
-ORDER BY 
-    available_seats DESC; -- Sorting by availability in descending order to see the most empty trips first
-
+-- Find drivers who have been assigned to more than 5 trips
+SELECT driver_id, driver_fullname, total_assigned_trips
+FROM view_driver_workload
+WHERE total_assigned_trips > 1
+ORDER BY total_assigned_trips DESC;
 
 
 
+-- Retrieve a list of drivers who currently have zero assigned trips
+SELECT driver_id, driver_fullname, licensetype, phone
+FROM view_driver_workload
+WHERE total_assigned_trips = 0;
 
-------------------------------------------------------------------------------------------------------------------
 
--- Create a view that combines Trip, Driver, and Bus information
--- This provides a clear overview of active trips with descriptive names
-CREATE OR REPLACE VIEW public.active_trip_details AS
-SELECT 
-    t.tripid,
-    t.tripdate,
-    d.fullname AS driver_name,
-    b.licenseplate AS bus_license_plate,
-    t.status
-FROM public.trip t
-JOIN public.driver d ON t.driverid = d.driverid
-JOIN public.bus b ON t.busid = b.busid
-WHERE t.status = 'Active'; -- Filtering only active trips
-
-select * from public.active_trip_details
-
-/* Query 1: Count active trips per driver
-This query calculates how many active trips are currently assigned to each driver.
-*/
-SELECT 
-    driver_name, 
-    COUNT(tripid) AS active_trips_count -- Count the total number of trips associated with each driver
-FROM public.active_trip_details
-GROUP BY driver_name -- Group the results by driver name to aggregate the count
-ORDER BY active_trips_count DESC; -- Sort by the number of trips in descending order to see the most active drivers
-
-/* Query 2: List active buses and their assigned drivers
-This query displays all currently active buses along with the name of the driver assigned to each one.
-*/
-SELECT 
-    bus_license_plate, 
-    driver_name,
-    tripdate
-FROM public.active_trip_details
-ORDER BY tripdate ASC; -- Order the list chronologically by trip date
