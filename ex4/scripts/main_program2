@@ -1,0 +1,40 @@
+DO $$
+DECLARE
+    -- משתנה שיחזיק את ה-Ref Cursor שיוחזר מהפונקציה
+    v_my_cursor REFCURSOR;
+    -- רשומה לקריאת נתונים מתוך הקרסור
+    v_reg_record RECORD;
+BEGIN
+    RAISE NOTICE '==================================================';
+    RAISE NOTICE 'STARTING MAIN PROGRAM 2';
+    RAISE NOTICE '==================================================';
+
+    -- 1. זימון פונקציה 2: קבלתRef Cursor עבור נוסע 1
+    RAISE NOTICE 'Step 1: Fetching active trips for passenger 1...';
+    v_my_cursor := get_passenger_active_trips(1);
+    
+    -- קריאת השורה הראשונה מתוך הקרסור שחזר מהפונקציה
+    FETCH NEXT FROM v_my_cursor INTO v_reg_record;
+    
+    IF FOUND THEN
+        RAISE NOTICE 'Found active registration! Reg ID: %, Trip ID: %', 
+                     v_reg_record.reg_id, v_reg_record.trip_id;
+    ELSE
+        RAISE NOTICE 'No active registrations found for this passenger.';
+    END IF;
+    
+    -- סגירת הקרסור שקיבלנו מהפונקציה
+    CLOSE v_my_cursor;
+
+    -- 2. זימון פרוצדורה 1: ביטול נסיעה מספר 99 וכל הרישומים שלה
+    RAISE NOTICE 'Step 2: Cancelling trip 99...';
+    CALL cancel_trip_and_notify(99);
+
+    RAISE NOTICE '==================================================';
+    RAISE NOTICE 'MAIN PROGRAM 2 COMPLETED SUCCESSFULLY';
+    RAISE NOTICE '==================================================';
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE NOTICE 'Main Program 2 failed with error: %', SQLERRM;
+END;
+$$;

@@ -1,0 +1,75 @@
+-- מחיקת הפרוצדורה אם היא קיימת כדי לאפשר יצירה מחדש
+DROP PROCEDURE IF EXISTS register_passenger_to_trip(INT, INT, INT, INT);
+
+CREATE OR REPLACE PROCEDURE register_passenger_to_trip(
+    p_pass_id INT,
+    p_trip_id INT,
+    p_boarding_stop INT,
+    p_dropoff_stop INT
+)
+AS $$
+DECLARE
+    v_passenger_exists INT;
+    v_available_seats INT;
+    v_new_reg_id INT;
+BEGIN
+    -- 1. בדיקת קיום הנוסע
+    SELECT COUNT(*) INTO v_passenger_exists FROM public.passenger WHERE pass_id = p_pass_id;
+    IF v_passenger_exists = 0 THEN
+        RAISE EXCEPTION 'Passenger with ID % does not exist.', p_pass_id;
+    END IF;
+
+    -- 2. בדיקת קיום הנסיעה וכמות המקומות הפנויים (Implicit Cursor)
+    SELECT available_seats INTO v_available_seats FROM public.trip WHERE trip_id = p_trip_id;
+    
+    IF v_available_seats IS NULL THEN
+        RAISE EXCEPTION 'Trip with ID % does not exist.', p_trip_id;
+    ELSIF v_available_seats <= 0 THEN
+        RAISE EXCEPTION 'Cannot register. No available seats left on trip %.', p_trip_id;
+    END IF;
+
+    -- 3. יצירת מזהה רץ חדש עבור הרישום (לקיחת המקסימום הנוכחי + 1)
+    SELECT COALESCE(MAX(reg_id), 0) + 1 INTO v_new_reg_id FROM public.registration;
+
+    -- 4. ביצוע הרישום - הכנסת נתונים (DML)
+    INSERT INTO public.registration (reg_id, status, pass_id, trip_id, boarding_stop_id, dropoff_stop_id)
+    VALUES (v_new_reg_id, 'Confirmed', p_pass_id, p_trip_id, p_boarding_stop, p_dropoff_stop);
+
+    -- 5. עדכון והורדת מקום פנוי מהתרשים (DML)
+    UPDATE public.trip 
+    SET available_seats = available_seats - 1 
+    WHERE trip_id = p_trip_id;
+
+    RAISE NOTICE 'Passenger % successfully registered to trip %. 1 seat deducted.', p_pass_id, p_trip_id;
+
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE NOTICE 'Registration failed for passenger % on trip %: %', p_pass_id, p_trip_id, SQLERRM;
+        RAISE;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 1. הרצת הפרוצדורה עם נתונים (החליפי למספרים קיימים אצלך במידת הצורך)
+-- פרמטרים: pass_id, trip_id, boarding_stop_id, dropoff_stop_id
+CALL register_passenger_to_trip(1, 99, 1, 2);
+
+-- 1. הוכחה שנוספה שורת רישום (הזמנה) חדשה עבור נוסע 1 בנסיעה 99
+SELECT * FROM public.registration WHERE pass_id = 1 AND trip_id = 99;
+
+-- 2. הוכחה שמספר המקומות הפנויים בנסיעה 99 ירד מ-10 ל-9!
+SELECT trip_id, available_seats, status FROM public.trip WHERE trip_id = 99;
+
+-- א. מציאת נוסע (pass_id) קיים במערכת
+SELECT pass_id, pass_fullname 
+FROM public.passenger 
+LIMIT 3;
+
+-- ב. מציאת נסיעה (trip_id) קיימת שיש בה מקומות פנויים (available_seats > 0)
+SELECT trip_id, available_seats, status 
+FROM public.trip 
+WHERE available_seats > 0 
+
+
+-- ג. מציאת שני מזהי תחנות (stop_id) שקיימים בטבלת התחנות שלך
+SELECT stop_id, stop_name FROM public.stop LIMIT 3;
+

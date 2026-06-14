@@ -1,0 +1,58 @@
+-- מחיקת הפונקציה אם היא קיימת כדי לאפשר יצירה מחדש חלקה
+DROP FUNCTION IF EXISTS get_passenger_active_trips(INT);
+
+CREATE OR REPLACE FUNCTION get_passenger_active_trips(p_passenger_id INT)
+RETURNS REFCURSOR AS $$
+DECLARE
+    -- הגדרת משתנה ה-Cursor שנחזיר
+    result_cursor REFCURSOR := 'passenger_trips_cursor';
+    -- משתנה זמני לבדיקת קיום הנוסע
+    v_passenger_name VARCHAR(100);
+BEGIN
+    -- 1. בדיקה האם הנוסע קיים במערכת (שימוש ב-Implicit Cursor)
+    SELECT pass_fullname INTO v_passenger_name 
+    FROM public.passenger 
+    WHERE pass_id = p_passenger_id;
+
+    -- אם לא נמצא נוסע, נזרוק חריגה (Exception)
+    IF v_passenger_name IS NULL THEN
+        RAISE EXCEPTION 'Passenger with ID % does not exist in the system.', p_passenger_id;
+    END IF;
+
+    -- 2. פתיחת ה-Ref Cursor עם השדות ללא הגבלת תאריך (מתאים לנתונים הישנים בגיבוי)
+    OPEN result_cursor FOR
+        SELECT 
+            r.reg_id,
+            r.status AS registration_status,
+            t.trip_id,
+            t.trip_date,
+            t.departure_time,
+            t.status AS trip_status,
+            rt.route_name
+        FROM public.registration r
+        JOIN public.trip t ON r.trip_id = t.trip_id
+        JOIN public.route rt ON t.route_id = rt.route_id
+        WHERE r.pass_id = p_passenger_id
+        ORDER BY t.trip_date DESC, t.departure_time DESC; -- מיון מהחדש לישן
+
+    -- החזרת ה-Cursor
+    RETURN result_cursor;
+
+EXCEPTION
+    WHEN OTHERS THEN
+        RAISE NOTICE 'An error occurred in get_passenger_active_trips: %', SQLERRM;
+        RAISE;
+END;
+$$ LANGUAGE plpgsql;
+
+-- תחילת הטרנזקציה (הכרחי לעבודה עם Ref Cursor ב-PostgreSQL)
+BEGIN;
+
+-- 1. זימון הפונקציה עם מזהה נוסע תקין הקיים במערכת
+SELECT get_passenger_active_trips(9265); -- pass_id אמיתי מהטבלה שלך
+
+-- 2. משיכת הנתונים מתוך ה-Cursor שהפונקציה פתחה (לפי השם שהוגדר בתוכה)
+FETCH ALL FROM "passenger_trips_cursor";
+
+-- סיום הטרנזקציה
+COMMIT;

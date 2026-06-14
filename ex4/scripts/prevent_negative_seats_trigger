@@ -1,0 +1,26 @@
+-- א. יצירת פונקציית הטריגר
+CREATE OR REPLACE FUNCTION public.fn_prevent_negative_seats()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- בדיקת תנאי (If): האם מנסים לעדכן למספר מקומות שלילי
+    IF NEW.available_seats < 0 THEN
+        -- זריקת חריגה מבוקרת (Exception) שחוסמת את פקודת ה-UPDATE
+        RAISE EXCEPTION 'Database Protection: Cannot update trip %. Available seats cannot be negative (Attempted: %).', 
+                        NEW.trip_id, NEW.available_seats;
+    END IF;
+
+    -- אם הכל תקין, תאשר את השורה החדשה להמשך העדכון
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- ב. הצמדת הטריגר לטבלת trip בזמן UPDATE
+DROP TRIGGER IF EXISTS trg_prevent_negative_seats ON public.trip;
+CREATE TRIGGER trg_prevent_negative_seats
+BEFORE UPDATE OF available_seats ON public.trip
+FOR EACH ROW
+EXECUTE FUNCTION public.fn_prevent_negative_seats();
+
+UPDATE public.trip 
+SET available_seats = -5 
+WHERE trip_id = 99;

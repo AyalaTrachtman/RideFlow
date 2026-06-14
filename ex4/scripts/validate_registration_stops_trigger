@@ -1,0 +1,26 @@
+-- א. יצירת פונקציית הטריגר
+CREATE OR REPLACE FUNCTION public.fn_validate_registration_stops()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- בדיקת תנאי (If): האם תחנת המוצא ותחנת היעד זהות
+    IF NEW.boarding_stop_id = NEW.dropoff_stop_id THEN
+        -- זריקת חריגה מבוקרת (Exception) שמבטלת את פקודת ה-INSERT
+        RAISE EXCEPTION 'Database Protection: Boarding stop and Dropoff stop cannot be the same (Stop ID: %).', 
+                        NEW.boarding_stop_id;
+    END IF;
+
+    -- אם הכל תקין, תאשר את הכנסת השורה החדשה לטבלה
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- ב. הצמדת הטריגר לטבלת registration בזמן INSERT
+DROP TRIGGER IF EXISTS trg_validate_registration_stops ON public.registration;
+CREATE TRIGGER trg_validate_registration_stops
+BEFORE INSERT ON public.registration
+FOR EACH ROW
+EXECUTE FUNCTION public.fn_validate_registration_stops();
+
+-- ננסה ליצור מזהה חדש זמני (למשל 99999) עם תחנת עלייה וירידה זהות (1 ו-1)
+INSERT INTO public.registration (reg_id, status, pass_id, trip_id, boarding_stop_id, dropoff_stop_id)
+VALUES (99999, 'OPEN', 1, 99, 1, 1);

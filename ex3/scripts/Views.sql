@@ -68,3 +68,4 @@ FROM view_driver_workload
 WHERE total_assigned_trips = 0;
 
 
+

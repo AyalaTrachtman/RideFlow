@@ -1,0 +1,74 @@
+-- מחיקת הפונקציה אם היא קיימת כדי לאפשר יצירה מחדש חלקה
+DROP FUNCTION IF EXISTS get_route_available_seats(INT);
+
+CREATE OR REPLACE FUNCTION get_route_available_seats(p_route_id INT)
+RETURNS INT AS $$
+DECLARE
+    -- 1. הגדרת משתנים מקומיים
+    v_total_seats INT := 0;          -- משתנה לצבירת המקומות הפנויים
+    v_route_exists VARCHAR(100);     -- משתנה לבדיקת קיום המסלול
+    v_trip_record RECORD;            -- רשומה (Record) שתחזיק שורה בכל סיבוב של הלולאה
+    
+    -- 2. הגדרת Explicit Cursor (סמן מפורש) ששולף את כל הנסיעות של אותו מסלול
+    trip_cursor CURSOR FOR 
+        SELECT available_seats 
+        FROM public.trip 
+        WHERE route_id = p_route_id;
+BEGIN
+    -- א. בדיקה האם המסלול בכלל קיים במערכת (שימוש ב-Implicit Cursor)
+    SELECT route_name INTO v_route_exists 
+    FROM public.route 
+    WHERE route_id = p_route_id;
+
+    -- ב. אם המסלול לא נמצא, נזרוק חריגה (Exception)
+    IF v_route_exists IS NULL THEN
+        RAISE EXCEPTION 'Route with ID % does not exist in the system.', p_route_id;
+    END IF;
+
+    -- ג. פתיחת ה-Explicit Cursor ועבודה עם לולאה (Loops & Records)
+    OPEN trip_cursor;
+    
+    LOOP
+        -- משיכת השורה הבאה מתוך הקרסור לתוך הרשומה
+        FETCH trip_cursor INTO v_trip_record;
+        
+        -- תנאי עצירה: אם נגמרו השורות, צא מהלולאה
+        EXIT WHEN NOT FOUND;
+        
+        -- צבירת המקומות הפנויים (הסתעפות/תנאי קטן למניעת ערכי NULL במקרה של תקלה)
+        IF v_trip_record.available_seats IS NOT NULL THEN
+            v_total_seats := v_total_seats + v_trip_record.available_seats;
+        END IF;
+        
+    END LOOP;
+    
+    -- ד. סגירת הקרסור המפורש
+    CLOSE trip_cursor;
+
+    -- ה. החזרת התוצאה הסופית
+    RETURN v_total_seats;
+
+EXCEPTION
+    -- טיפול בשגיאות כלליות
+    WHEN OTHERS THEN
+        -- לוודא שהקרסור ייסגר גם אם קרתה תקלה באמצע הריצה
+        IF ISOPEN trip_cursor THEN
+            CLOSE trip_cursor;
+        END IF;
+        RAISE NOTICE 'An error occurred in get_route_available_seats: %', SQLERRM;
+        RAISE;
+END;
+$$ LANGUAGE plpgsql;
+
+
+-- מציאת מזהי מסלולים (route_id) קיימים כדי להשתמש בהם בטסט
+SELECT route_id, COUNT(*) as number_of_trips
+FROM public.trip
+GROUP BY route_id
+LIMIT 5;
+
+-- זימון הפונקציה עבור מסלול תקין 
+SELECT public.get_route_available_seats(2) AS total_available_seats_on_route;
+
+-- זימון הפונקציה עם מזהה מסלול שלא קיים כדי להראות שה-Exception עובד
+SELECT public.get_route_available_seats(99999);

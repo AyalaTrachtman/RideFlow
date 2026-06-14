@@ -1,0 +1,69 @@
+-- מחיקת הפרוצדורה אם היא קיימת כדי לאפשר יצירה מחדש
+DROP PROCEDURE IF EXISTS cancel_trip_and_notify(INT);
+
+CREATE OR REPLACE PROCEDURE cancel_trip_and_notify(p_trip_id INT)
+AS $$
+DECLARE
+    -- משתנים לבדיקות וניהול לולאה
+    v_trip_exists INT;
+    v_reg_record RECORD;
+    
+    -- הגדרת Explicit Cursor למציאת כל הרישומים של הנסיעה הזו
+    reg_cursor CURSOR FOR 
+        SELECT reg_id 
+        FROM public.registration 
+        WHERE trip_id = p_trip_id;
+BEGIN
+    -- 1. בדיקה האם הנסיעה קיימת במערכת
+    SELECT COUNT(*) INTO v_trip_exists 
+    FROM public.trip 
+    WHERE trip_id = p_trip_id;
+
+    IF v_trip_exists = 0 THEN
+        RAISE EXCEPTION 'Trip with ID % does not exist.', p_trip_id;
+    END IF;
+
+    -- 2. עדכון סטטוס הנסיעה בטבלת trip (DML)
+    UPDATE public.trip 
+    SET status = 'Cancelled' 
+    WHERE trip_id = p_trip_id;
+    
+    RAISE NOTICE 'Trip % status updated to Cancelled.', p_trip_id;
+
+    -- 3. פתיחת הקרסור ועדכון כל הרישומים המשויכים (DML בתוך לולאה)
+    OPEN reg_cursor;
+    LOOP
+        FETCH reg_cursor INTO v_reg_record;
+        EXIT WHEN NOT FOUND; -- תנאי עצירה
+        
+        -- עדכון הסטטוס של הרישום הספציפי
+        UPDATE public.registration
+        SET status = 'Cancelled'
+        WHERE reg_id = v_reg_record.reg_id;
+        
+        RAISE NOTICE 'Registration ID % has been cancelled.', v_reg_record.reg_id;
+    END LOOP;
+    CLOSE reg_cursor;
+
+    RAISE NOTICE 'All registrations for trip % have been successfully cancelled.', p_trip_id;
+
+EXCEPTION
+    -- טיפול בחריגות וביצוע Rollback במידה ומשהו נכשל
+    WHEN OTHERS THEN
+        IF ISOPEN reg_cursor THEN
+            CLOSE reg_cursor;
+        END IF;
+        RAISE NOTICE 'Error in cancel_trip_and_notify: %', SQLERRM;
+        RAISE;
+END;
+$$ LANGUAGE plpgsql;
+
+-- 1. מציאת מזהה נסיעה (trip_id) שיש לו רישומים כדי לבדוק עליו
+SELECT trip_id, COUNT(*) FROM public.registration GROUP BY trip_id ;
+
+-- 2. הרצת הפרוצדורה
+CALL cancel_trip_and_notify(598630); 
+
+-- 3. הוכחה לדו"ח (בדיקה שהנתונים אכן השתנו בבסיס הנתונים):
+SELECT * FROM public.trip WHERE trip_id = 598630;
+SELECT * FROM public.registration WHERE trip_id = 598630;
