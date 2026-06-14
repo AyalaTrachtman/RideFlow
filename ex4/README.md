@@ -1,20 +1,5 @@
 **דו"ח שלב ד – תכנות**
 
-תיאור כללי
-- **מטרה:** להציג את הפונקציות, הפרוצדורות, הטריגרים והתוכניות הראשיות שנבנו עבור מסד הנתונים של פרויקט RideFlow, כולל תיאור, קוד והוכחות הרצה (תמונות).
-- **מיקום קוד:** כל קבצי ה-SQL נמצאים בתיקיה [ex4/scripts](ex4/scripts)
-- **תמונות:** כל התמונות משולבות בהמשך מתוך [ex4/screenshots](ex4/screenshots)
-
-**הערה חשובה לגבי הגשה**
-- חובה ליצור TAG בגיט עבור השלב הזה. דוגמה לפקודות:
-
-```powershell
-git add .
-git commit -m "שלב ד - תכנות: הוספת קבצי SQL ודו"ח"
-git tag -a v4 -m "שלב ד - תכנות"
-git push origin main --tags
-```
-
 ---
 
 **פונקציה 1 – `get_route_available_seats_function`**
@@ -571,3 +556,37 @@ git push origin main --tags
 **סיכום ומסקנות**
 - כל הפונקציות, הפרוצדורות והטריגרים נשמרו בקבצי SQL תחת [ex4/scripts](ex4/scripts). התמונות המצורפות מוכיחות יצירת פריטים, הרצות תקינות והרצות שגויות שמייצרות חריגות.
 - אם חסרות תמונות ספציפיות עבור פריט מסוים, אנא הודיעו לי ואוסיף אותן ישירות ל-README כפי שנדרש.
+
+---
+
+**כל התמונות (כל קבצי ה-SCREENSHOTS בתיקיה `ex4/screenshots`)**
+
+![create_function1](screenshots/create_function1.png)
+![create_function2](screenshots/create_function2.png)
+![create_procedore1](screenshots/create_procedore1.png)
+![good_run2_function2](screenshots/good_run2_function2.png)
+![good_run_function2](screenshots/good_run_function2.png)
+![good_run_functon1](screenshots/good_run_functon1.png)
+![run_database_befoe_rinprocdure1](screenshots/run_database_befoe_rinprocdure1.png)
+![Screenshot 2026-06-14 005357](screenshots/Screenshot 2026-06-14 005357.png)
+![Screenshot 2026-06-14 024817](screenshots/Screenshot 2026-06-14 024817.png)
+![Screenshot 2026-06-14 024835](screenshots/Screenshot 2026-06-14 024835.png)
+![Screenshot 2026-06-14 024843](screenshots/Screenshot 2026-06-14 024843.png)
+![Screenshot 2026-06-14 024858](screenshots/Screenshot 2026-06-14 024858.png)
+![Screenshot 2026-06-14 025001](screenshots/Screenshot 2026-06-14 025001.png)
+![Screenshot 2026-06-14 025245](screenshots/Screenshot 2026-06-14 025245.png)
+![Screenshot 2026-06-14 025254](screenshots/Screenshot 2026-06-14 025254.png)
+![Screenshot 2026-06-14 025306](screenshots/Screenshot 2026-06-14 025306.png)
+![Screenshot 2026-06-14 025315](screenshots/Screenshot 2026-06-14 025315.png)
+![Screenshot 2026-06-14 025332](screenshots/Screenshot 2026-06-14 025332.png)
+![Screenshot 2026-06-14 025514](screenshots/Screenshot 2026-06-14 025514.png)
+![Screenshot 2026-06-14 025523](screenshots/Screenshot 2026-06-14 025523.png)
+![Screenshot 2026-06-14 025600](screenshots/Screenshot 2026-06-14 025600.png)
+![Screenshot 2026-06-14 025611](screenshots/Screenshot 2026-06-14 025611.png)
+![Screenshot 2026-06-14 030201](screenshots/Screenshot 2026-06-14 030201.png)
+![Screenshot 2026-06-14 030215](screenshots/Screenshot 2026-06-14 030215.png)
+![Screenshot 2026-06-14 030225](screenshots/Screenshot 2026-06-14 030225.png)
+![Screenshot 2026-06-14 030240](screenshots/Screenshot 2026-06-14 030240.png)
+![wring_run_function1](screenshots/wring_run_function1.png)
+![wrong_run_function2](screenshots/wrong_run_function2.png)
+
