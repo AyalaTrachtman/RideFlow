@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RideFlow - מערכת ניהול נסיעות</title>
+    <!-- Google Fonts: Outfit & Assistant -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;600;700&family=Outfit:wght@300;400;600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="brand">
+                <span class="brand-logo">⚡</span>
+                <h1 class="brand-name">RideFlow</h1>
+            </div>
+            <nav class="nav-menu">
+                <a href="#" class="nav-item active" id="nav-dashboard" onclick="switchTab('dashboard')">
+                    <span class="nav-icon">📊</span> לוח בקרה
+                </a>
+                <a href="#" class="nav-item" id="nav-crud" onclick="switchTab('crud')">
+                    <span class="nav-icon">📁</span> ניהול נתונים (CRUD)
+                </a>
+                <a href="#" class="nav-item" id="nav-queries" onclick="switchTab('queries')">
+                    <span class="nav-icon">🔎</span> שאילתות מורכבות
+                </a>
+                <a href="#" class="nav-item" id="nav-routines" onclick="switchTab('routines')">
+                    <span class="nav-icon">⚙️</span> פונקציות ופרוצדורות
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <p>ממשק ניהול בסיס נתונים</p>
+                <small>שלב ה' - פרויקט גמר</small>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <header class="top-bar">
+                <div class="page-title-container">
+                    <h2 id="current-page-title">לוח בקרה</h2>
+                    <p class="subtitle" id="current-page-subtitle">מבט על סטטיסטיקות בסיס הנתונים</p>
+                </div>
+                <div class="db-status">
+                    <span class="status-dot online"></span>
+                    <span>בסיס הנתונים מחובר</span>
+                </div>
+            </header>
+
+            <div class="content-body">
+                <!-- 1. DASHBOARD TAB -->
+                <section id="tab-dashboard" class="tab-section active">
+                    <div class="stats-grid">
+                        <div class="stat-card" onclick="switchTab('crud', 'driver')">
+                            <div class="stat-icon">👨‍✈️</div>
+                            <div class="stat-info">
+                                <span class="stat-value" id="stat-driver">-</span>
+                                <span class="stat-label">נהגים</span>
+                            </div>
+                        </div>
+                        <div class="stat-card" onclick="switchTab('crud', 'passenger')">
+                            <div class="stat-icon">👥</div>
+                            <div class="stat-info">
+                                <span class="stat-value" id="stat-passenger">-</span>
+                                <span class="stat-label">נוסעים</span>
+                            </div>
+                        </div>
+                        <div class="stat-card" onclick="switchTab('crud', 'trip')">
+                            <div class="stat-icon">🚐</div>
+                            <div class="stat-info">
+                                <span class="stat-value" id="stat-trip">-</span>
+                                <span class="stat-label">נסיעות</span>
+                            </div>
+                        </div>
+                        <div class="stat-card" onclick="switchTab('crud', 'registration')">
+                            <div class="stat-icon">🎟️</div>
+                            <div class="stat-info">
+                                <span class="stat-value" id="stat-registration">-</span>
+                                <span class="stat-label">הרשמות</span>
+                            </div>
+                        </div>
+                        <div class="stat-card" onclick="switchTab('crud', 'route')">
+                            <div class="stat-icon">🗺️</div>
+                            <div class="stat-info">
+                                <span class="stat-value" id="stat-route">-</span>
+                                <span class="stat-label">מסלולים</span>
+                            </div>
+                        </div>
+                        <div class="stat-card" onclick="switchTab('crud', 'stop')">
+                            <div class="stat-icon">📍</div>
+                            <div class="stat-info">
+                                <span class="stat-value" id="stat-stop">-</span>
+                                <span class="stat-label">תחנות</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-hero">
+                        <h3>ברוכים הבאים ל-RideFlow Management System</h3>
+                        <p>כאן תוכלו לנהל את כל היבטי רשת הנסיעות המשותפות שלכם. המערכת מאפשרת ניהול מלא של טבלאות
+                            המפתח, הרצת שאילתות סטטיסטיות מתקדמות, וביצוע תהליכים אוטומטיים באמצעות פונקציות ופרוצדורות
+                            הרצות בתוך מסד הנתונים.</p>
+                        <div class="hero-actions">
+                            <button class="btn btn-primary" onclick="switchTab('crud')">מעבר למסכי ניהול
+                                הנתונים</button>
+                            <button class="btn btn-secondary" onclick="switchTab('routines')">הרצת תהליכים
+                                (Procedures)</button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 2. CRUD TAB -->
+                <section id="tab-crud" class="tab-section">
+                    <div class="crud-controls">
+                        <div class="form-group inline-group">
+                            <label for="table-selector">בחר טבלה לניהול:</label>
+                            <select id="table-selector" class="form-control" onchange="onTableChange()">
+                                <option value="driver">👨‍✈️ נהגים (driver)</option>
+                                <option value="passenger">👥 נוסעים (passenger)</option>
+                                <option value="vehicle">🚌 כלי רכב (vehicle)</option>
+                                <option value="route">🗺️ מסלולים (route)</option>
+                                <option value="stop">📍 תחנות (stop)</option>
+                                <option value="includes">🔗 תחנות במסלול (includes)</option>
+                                <option value="trip">🚐 נסיעות (trip)</option>
+                                <option value="registration">🎟️ הרשמות לנסיעה (registration)</option>
+                            </select>
+                        </div>
+                        <div class="crud-actions">
+                            <button class="btn btn-success" onclick="openAddModal()">➕ הוספת רשומה</button>
+                            <button class="btn btn-warning" onclick="openUpdateModal()">✏️ עדכון רשומה</button>
+                        </div>
+                    </div>
+
+                    <div class="search-bar-container">
+                        <input type="text" id="table-search" placeholder="חיפוש מהיר בטבלה..." onkeyup="filterTable()">
+                        <span class="search-info" id="row-count">טוען נתונים...</span>
+                    </div>
+
+                    <div class="table-card">
+                        <div class="table-responsive">
+                            <table id="data-table">
+                                <thead>
+                                    <!-- Dynamic headers will be inserted here -->
+                                </thead>
+                                <tbody>
+                                    <!-- Dynamic rows will be inserted here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 3. QUERIES TAB -->
+                <section id="tab-queries" class="tab-section">
+                    <div class="queries-grid">
+                        <div class="query-card">
+                            <h4>📊 שאילתא 1: נסיעות מעל הממוצע</h4>
+                            <p>מציגה את הנסיעות שבהן כמות ההרשמות גבוהה מהממוצע הכללי של הרשמות לנסיעה במערכת.</p>
+                            <button class="btn btn-primary" onclick="runCustomQuery('1')">הרץ שאילתה</button>
+                        </div>
+                        <div class="query-card">
+                            <h4>👨‍✈️ שאילתא 2: נהגים פעילים במיוחד</h4>
+                            <p>מציגה נהגים אשר רשומים ומשויכים ליותר מ-3 נסיעות שונות במערכת.</p>
+                            <button class="btn btn-primary" onclick="runCustomQuery('2')">הרץ שאילתה</button>
+                        </div>
+                        <div class="query-card">
+                            <h4>🗺️ שאילתא 3: כמות הרשמות לכל מסלול</h4>
+                            <p>מציגה את רשימת המסלולים ממוינת לפי סך כל ההרשמות שהתבצעו לנסיעות בהם בסדר יורד.</p>
+                            <button class="btn btn-primary" onclick="runCustomQuery('3')">הרץ שאילתה</button>
+                        </div>
+                    </div>
+
+                    <div class="query-results-container" id="query-results-section" style="display: none;">
+                        <h3 id="query-title-display">תוצאות שאילתה</h3>
+                        <div class="table-card">
+                            <div class="table-responsive">
+                                <table id="query-results-table">
+                                    <thead></thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 4. ROUTINES TAB -->
+                <section id="tab-routines" class="tab-section">
+                    <div class="routines-container">
+                        <!-- Routine 1: Cancel Trip -->
+                        <div class="routine-card">
+                            <h3>❌ ביטול נסיעה ועדכון הרשמות (Procedure)</h3>
+                            <p class="description">מפעיל את הפרוצדורה `cancel_trip_and_notify` המעדכנת את סטטוס הנסיעה
+                                ל-'Cancelled', ובאמצעות Cursor מעדכנת את כל ההרשמות התואמות ל-'Cancelled'.</p>
+                            <form id="form-cancel-trip" onsubmit="executeCancelTrip(event)">
+                                <div class="form-group">
+                                    <label for="routine-trip-select">בחר נסיעה לביטול:</label>
+                                    <select id="routine-trip-select" class="form-control" required>
+                                        <option value="">-- טוען נסיעות... --</option>
+                                    </select>
+                                </div>
+                                <button type="submit" class="btn btn-danger">בצע ביטול נסיעה</button>
+                            </form>
+                            <div class="routine-feedback" id="feedback-cancel-trip"></div>
+                        </div>
+
+                        <!-- Routine 2: Register Passenger -->
+                        <div class="routine-card">
+                            <h3>📝 הרשמת נוסע לנסיעה עם עדכון מקומות (Procedure)</h3>
+                            <p class="description">מפעיל את הפרוצדורה `register_passenger_to_trip`. מבצע הרשמה (DML),
+                                מוריד מקום פנוי מהנסיעה (DML), ובודק שקיים מקום פנוי ושהנוסע קיים.</p>
+                            <form id="form-register-passenger" onsubmit="executeRegisterPassenger(event)">
+                                <div class="form-grid">
+                                    <div class="form-group">
+                                        <label for="routine-pass-select">בחר נוסע:</label>
+                                        <select id="routine-pass-select" class="form-control" required></select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="routine-trip-reg-select">בחר נסיעה פנויה:</label>
+                                        <select id="routine-trip-reg-select" class="form-control" required></select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="routine-board-select">תחנת עלייה:</label>
+                                        <select id="routine-board-select" class="form-control" required></select>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="routine-drop-select">תחנת הורדה:</label>
+                                        <select id="routine-drop-select" class="form-control" required></select>
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-success">בצע הרשמה</button>
+                            </form>
+                            <div class="routine-feedback" id="feedback-register-passenger"></div>
+                        </div>
+
+                        <!-- Routine 3: Passenger Active Trips -->
+                        <div class="routine-card">
+                            <h3>🔍 שליפת נסיעות פעילות של נוסע (Function - Ref Cursor)</h3>
+                            <p class="description">קורא לפונקציה `get_passenger_active_trips` המחזירה Ref Cursor המכיל
+                                את כל הנסיעות והסטטוסים של הנוסע.</p>
+                            <form id="form-passenger-trips" onsubmit="executeGetPassengerTrips(event)">
+                                <div class="form-group">
+                                    <label for="routine-pass-lookup">בחר נוסע:</label>
+                                    <select id="routine-pass-lookup" class="form-control" required></select>
+                                </div>
+                                <button type="submit" class="btn btn-primary">שלוף נסיעות</button>
+                            </form>
+                            <div class="routine-feedback" id="feedback-passenger-trips">
+                                <div class="table-responsive" style="margin-top: 15px; display: none;">
+                                    <table id="tbl-passenger-trips" class="nested-table">
+                                        <thead>
+                                            <tr>
+                                                <th>מזהה הרשמה</th>
+                                                <th>סטטוס הרשמה</th>
+                                                <th>מזהה נסיעה</th>
+                                                <th>תאריך</th>
+                                                <th>שעת יציאה</th>
+                                                <th>סטטוס נסיעה</th>
+                                                <th>שם מסלול</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody></tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Routine 4: Route Available Seats -->
+                        <div class="routine-card">
+                            <h3>💺 סך מקומות פנויים במסלול (Function - Loops & Cursor)</h3>
+                            <p class="description">קורא לפונקציה `get_route_available_seats` המחשבת באמצעות Explicit
+                                Cursor ולולאה את סך המקומות הפנויים בכל הנסיעות המשויכות למסלול זה.</p>
+                            <form id="form-route-seats" onsubmit="executeGetRouteSeats(event)">
+                                <div class="form-group">
+                                    <label for="routine-route-lookup">בחר מסלול:</label>
+                                    <select id="routine-route-lookup" class="form-control" required></select>
+                                </div>
+                                <button type="submit" class="btn btn-primary">חשב מקומות פנויים</button>
+                            </form>
+                            <div class="routine-feedback" id="feedback-route-seats"></div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <!-- ADD MODAL -->
+    <div id="add-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal('add-modal')">&times;</span>
+            <h3 id="add-modal-title">הוספת רשומה חדשה</h3>
+            <form id="add-form" onsubmit="submitAddForm(event)">
+                <div id="add-form-fields" class="form-fields-container">
+                    <!-- Dynamic fields based on table -->
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-success">הוסף רשומה</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('add-modal')">ביטול</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- UPDATE MODAL -->
+    <div id="update-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal('update-modal')">&times;</span>
+            <h3 id="update-modal-title">עדכון רשומה</h3>
+
+            <!-- Fetch Row Stage -->
+            <div id="fetch-row-stage">
+                <p class="info-alert"><strong>הנחיות:</strong> לצורך עדכון, אנא הזן את מזהה הרשומה (מפתח ראשי) ולחץ על
+                    "טען פרטים". המערכת תשלוף את שאר השדות מהמסד ותציג אותם לעריכה.</p>
+                <div class="form-group" id="fetch-key-inputs">
+                    <!-- Dynamic primary key inputs will appear here -->
+                </div>
+                <button type="button" class="btn btn-primary" onclick="fetchRowForUpdate()">טען פרטים מהמסד</button>
+            </div>
+
+            <!-- Edit Details Stage (hidden initially) -->
+            <form id="update-form" onsubmit="submitUpdateForm(event)" style="display: none;">
+                <div id="update-form-fields" class="form-fields-container">
+                    <!-- Dynamic fields loaded from fetch -->
+                </div>
+                <div class="form-actions" style="margin-top: 20px;">
+                    <button type="submit" class="btn btn-warning">עדכן ושמור שינויים</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('update-modal')">ביטול</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="/js/main.js"></script>
+</body>
+
+</html>
