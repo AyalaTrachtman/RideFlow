@@ -15,6 +15,7 @@ TABLES = {
     'route': 'route',
     'stop': 'stop',
     'includes': 'includes',
+    'routestop': 'routestop',
     'trip': 'trip',
     'registration': 'registration'
 }
@@ -24,7 +25,7 @@ def get_db_connection():
     return psycopg2.connect(
         host="localhost",
         port=5432,
-        database="rideFlowDB",
+        database="merged",
         user="rideflow_user",
         password="rideflowsecret"
     )
@@ -150,6 +151,14 @@ def get_table_data(table_name):
                 JOIN public.{TABLES['stop']} s ON i.stop_id = s.stop_id
                 ORDER BY i.route_id DESC LIMIT %s;
             """, (limit,))
+        elif table_name == 'routestop':
+            cur.execute(f"""
+                SELECT rs.route_id, r.route_name, rs.stop_id, s.stop_name, rs.stop_order
+                FROM public.{TABLES['routestop']} rs
+                JOIN public.{TABLES['route']} r ON rs.route_id = r.route_id
+                JOIN public.{TABLES['stop']} s ON rs.stop_id = s.stop_id
+                ORDER BY rs.route_id DESC, rs.stop_order ASC LIMIT %s;
+            """, (limit,))
         elif table_name == 'trip':
             cur.execute(f"""
                 SELECT t.trip_id, t.trip_date, t.departure_time, t.available_seats,
@@ -206,6 +215,7 @@ def fetch_single_record(table_name):
             'stop': 'stop_id',
             'trip': 'trip_id',
             'includes': 'route_id,stop_id',
+            'routestop': 'route_id,stop_id',
             'registration': 'reg_id,pass_id'
         }
         
@@ -284,6 +294,9 @@ def create_record(table_name):
             cur.execute(f"INSERT INTO public.{resolved_table} (stop_id, stop_name) VALUES (%s, %s);", (new_id, data['stop_name']))
         elif table_name == 'includes':
             cur.execute(f"INSERT INTO public.{resolved_table} (route_id, stop_id) VALUES (%s, %s);", (data['route_id'], data['stop_id']))
+        elif table_name == 'routestop':
+            cur.execute(f"INSERT INTO public.{resolved_table} (route_id, stop_id, stop_order) VALUES (%s, %s, %s);", 
+                        (data['route_id'], data['stop_id'], data['stop_order']))
         elif table_name == 'trip':
             cur.execute(f"SELECT COALESCE(MAX(trip_id), 0) + 1 FROM public.{resolved_table};")
             new_id = cur.fetchone()[0]
@@ -332,6 +345,9 @@ def update_record(table_name):
             cur.execute(f"UPDATE public.{resolved_table} SET route_name = %s WHERE route_id = %s;", (data['route_name'], data['route_id']))
         elif table_name == 'stop':
             cur.execute(f"UPDATE public.{resolved_table} SET stop_name = %s WHERE stop_id = %s;", (data['stop_name'], data['stop_id']))
+        elif table_name == 'routestop':
+            cur.execute(f"UPDATE public.{resolved_table} SET stop_order = %s WHERE route_id = %s AND stop_id = %s;", 
+                        (data['stop_order'], data['route_id'], data['stop_id']))
         elif table_name == 'trip':
             cur.execute(f"UPDATE public.{resolved_table} SET trip_date = %s, departure_time = %s, available_seats = %s, route_id = %s, driver_id = %s, plate_number = %s WHERE trip_id = %s;", 
                         (data['trip_date'], data['departure_time'], data['available_seats'], data['route_id'], data['driver_id'], data['plate_number'], data['trip_id']))
@@ -373,6 +389,9 @@ def delete_record(table_name):
         elif table_name == 'stop':
             cur.execute(f"DELETE FROM public.{resolved_table} WHERE stop_id = %s;", (request.args.get('stop_id'),))
         elif table_name == 'includes':
+            cur.execute(f"DELETE FROM public.{resolved_table} WHERE route_id = %s AND stop_id = %s;", 
+                        (request.args.get('route_id'), request.args.get('stop_id')))
+        elif table_name == 'routestop':
             cur.execute(f"DELETE FROM public.{resolved_table} WHERE route_id = %s AND stop_id = %s;", 
                         (request.args.get('route_id'), request.args.get('stop_id')))
         elif table_name == 'trip':

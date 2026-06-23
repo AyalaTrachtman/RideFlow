@@ -52,7 +52,8 @@ const columnTranslations = {
 const hiddenColumnsPerTable = {
     'trip': ['route_id', 'driver_id'],
     'registration': ['pass_id', 'trip_id', 'boarding_stop_id', 'dropoff_stop_id'],
-    'includes': ['route_id', 'stop_id']
+    'includes': ['route_id', 'stop_id'],
+    'routestop': ['route_id', 'stop_id']
 };
 
 // Primary keys per table
@@ -63,6 +64,7 @@ const primaryKeys = {
     'route': ['route_id'],
     'stop': ['stop_id'],
     'includes': ['route_id', 'stop_id'],
+    'routestop': ['route_id', 'stop_id'],
     'trip': ['trip_id'],
     'registration': ['reg_id', 'pass_id']
 };
@@ -371,6 +373,10 @@ async function openAddModal() {
     } else if (currentTable === 'includes') {
         fieldsHtml += generateSelectInput('route_id', 'בחר מסלול', dbOptions.route, 'route_id', 'route_name', true);
         fieldsHtml += generateSelectInput('stop_id', 'בחר תחנה', dbOptions.stop, 'stop_id', 'stop_name', true);
+    } else if (currentTable === 'routestop') {
+        fieldsHtml += generateSelectInput('route_id', 'בחר מסלול', dbOptions.route, 'route_id', 'route_name', true);
+        fieldsHtml += generateSelectInput('stop_id', 'בחר תחנה', dbOptions.stop, 'stop_id', 'stop_name', true);
+        fieldsHtml += generateNumberInput('stop_order', 'מיקום תחנה (סדר)', 1, true);
     } else if (currentTable === 'trip') {
         fieldsHtml += generateDateInput('trip_date', 'תאריך נסיעה', true);
         fieldsHtml += generateTextInput('departure_time', 'שעת יציאה (08:30)', true);
@@ -400,7 +406,7 @@ async function submitAddForm(event) {
     event.preventDefault();
     const formData = new FormData(document.getElementById('add-form'));
     const payload = {};
-    const intFields = ['capacity', 'available_seats', 'route_id', 'stop_id', 'driver_id', 'pass_id', 'trip_id', 'boarding_stop_id', 'dropoff_stop_id'];
+    const intFields = ['capacity', 'available_seats', 'route_id', 'stop_id', 'driver_id', 'pass_id', 'trip_id', 'boarding_stop_id', 'dropoff_stop_id', 'stop_order'];
     formData.forEach((val, key) => {
         payload[key] = intFields.includes(key) ? (val ? parseInt(val) : null) : (val || null);
     });
@@ -457,6 +463,10 @@ async function openUpdateModal(rowIdx = null) {
     else if (currentTable === 'route')     keysHtml = generateSelectInput('id', 'בחר מסלול', dbOptions.route, 'route_id', 'route_name', true);
     else if (currentTable === 'stop')      keysHtml = generateSelectInput('id', 'בחר תחנה', dbOptions.stop, 'stop_id', 'stop_name', true);
     else if (currentTable === 'includes') {
+        keysHtml = generateSelectInput('route_id', 'מסלול', dbOptions.route, 'route_id', 'route_name', true);
+        keysHtml += generateSelectInput('stop_id', 'תחנה', dbOptions.stop, 'stop_id', 'stop_name', true);
+    }
+    else if (currentTable === 'routestop') {
         keysHtml = generateSelectInput('route_id', 'מסלול', dbOptions.route, 'route_id', 'route_name', true);
         keysHtml += generateSelectInput('stop_id', 'תחנה', dbOptions.stop, 'stop_id', 'stop_name', true);
     }
@@ -517,6 +527,11 @@ function renderUpdateFormFields(rowData) {
         html += `<input type="hidden" name="stop_id" value="${rowData.stop_id}">`;
         html += `<div class="form-group"><label>מזהה תחנה (נעול)</label><input class="form-control" type="text" value="${rowData.stop_id}" disabled></div>`;
         html += generateTextInput('stop_name', 'שם התחנה', true, 'text', rowData.stop_name || '');
+    } else if (currentTable === 'routestop') {
+        html += `<input type="hidden" name="route_id" value="${rowData.route_id}">`;
+        html += `<input type="hidden" name="stop_id" value="${rowData.stop_id}">`;
+        html += `<div class="form-group"><label>מסלול: ${rowData.route_name || rowData.route_id} / תחנה: ${rowData.stop_name || rowData.stop_id} (נעול)</label></div>`;
+        html += generateNumberInput('stop_order', 'מיקום תחנה (סדר)', 1, true, rowData.stop_order);
     } else if (currentTable === 'trip') {
         html += `<input type="hidden" name="trip_id" value="${rowData.trip_id}">`;
         html += `<div class="form-group"><label>מזהה נסיעה (נעול)</label><input class="form-control" type="text" value="${rowData.trip_id}" disabled></div>`;
@@ -549,7 +564,7 @@ async function submitUpdateForm(event) {
     event.preventDefault();
     const formData = new FormData(document.getElementById('update-form'));
     const payload = {};
-    const intFields = ['capacity', 'available_seats', 'route_id', 'stop_id', 'driver_id', 'pass_id', 'trip_id', 'boarding_stop_id', 'dropoff_stop_id', 'reg_id'];
+    const intFields = ['capacity', 'available_seats', 'route_id', 'stop_id', 'driver_id', 'pass_id', 'trip_id', 'boarding_stop_id', 'dropoff_stop_id', 'reg_id', 'stop_order'];
     formData.forEach((val, key) => {
         payload[key] = intFields.includes(key) ? (val ? parseInt(val) : null) : (val || null);
     });
